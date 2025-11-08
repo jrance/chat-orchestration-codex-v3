@@ -1,0 +1,575 @@
+{
+  "$id": "https://example.com/agent-builder/ir.schema.v1_0.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent Builder IR (v1.0 – orchestration core)",
+  "type": "object",
+  "required": ["meta", "nodes", "edges"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["id", "name", "version"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "draft": { "type": "boolean", "default": false },
+        "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": true
+    },
+
+    "entryId": { "type": "string", "description": "Node id that starts this graph (optional if a Router/Trigger is first)." },
+
+    "schemas": {
+      "description": "Reusable JSON Schemas for node IO & structured outputs (Row, RowResult, Evidence, Synthesis, Form schemas, etc.)",
+      "type": "object",
+      "additionalProperties": { "type": "object" }
+    },
+
+    "defaults": {
+      "description": "Graph-level defaults that nodes may inherit/override.",
+      "type": "object",
+      "properties": {
+        "historyPolicy": { "$ref": "#/$defs/HistoryPolicy" },
+        "toolTimeoutMs": { "type": "integer", "minimum": 0 },
+        "maxParallelism": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": true
+    },
+
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Node" }
+    },
+
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Edge" }
+    }
+  },
+
+  "$defs": {
+    "NodeIO": {
+      "type": "object",
+      "properties": {
+        "inputsSchemaRef": { "type": "string" },
+        "outputSchemaRef": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+
+    "BaseNode": {
+      "type": "object",
+      "required": ["id", "kind", "label"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "type": "string" },
+        "label": { "type": "string" },
+        "description": { "type": "string" },
+        "io": { "$ref": "#/$defs/NodeIO" },
+        "telemetry": {
+          "type": "object",
+          "properties": {
+            "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+            "emitUsage": { "type": "boolean", "default": true }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "EntryChatFormNode": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseNode" },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "const": "entry.chat_form" },
+            "data": {
+              "type": "object",
+              "properties": {
+                "acceptMessages": { "type": "boolean", "default": true },
+                "formSchemaRef": { "type": "string", "description": "Schema for form fields; file fields included here or via fileFields." },
+                "fileFields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["field", "accept"],
+                    "properties": {
+                      "field": { "type": "string", "description": "Path under form.values where FileRef will live." },
+                      "accept": { "type": "array", "items": { "type": "string" }, "description": "Allowed MIME types." },
+                      "maxFiles": { "type": "integer", "minimum": 1, "default": 1 },
+                      "maxSizeMB": { "type": "integer", "minimum": 1, "default": 25 }
+                    }
+                  }
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+
+    "RouterNode": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseNode" },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "const": "router" },
+            "data": {
+              "type": "object",
+              "properties": {
+                "mode": { "enum": ["llm", "deterministic"], "default": "llm" },
+                "prompt": { "type": "string" },
+                "minConfidence": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.0 },
+                "targets": { "type": "array", "items": { "type": "string" } },
+                "tieBreak": { "enum": ["HighestConfidence", "DeterministicOrder", "PreferList"], "default": "HighestConfidence" },
+                "tieBreakPrefer": { "type": "array", "items": { "type": "string" } },
+                "fallback": {
+                  "type": "object",
+                  "properties": {
+                    "mode": { "enum": ["AskUserClarify", "DefaultChild", "SafeAgent", "Error"], "default": "DefaultChild" },
+                    "defaultChild": { "type": "string" }
+                  }
+                },
+                "routeSchema": { "type": "object", "additionalProperties": true },
+                "autoSyncEnum": { "type": "boolean", "default": true }
+              },
+              "required": ["routeSchema"],
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+
+    "SequentialNode": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseNode" },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "const": "sequential" },
+            "data": {
+              "type": "object",
+              "properties": {
+                "childrenOrder": { "type": "array", "items": { "type": "string" } },
+                "breakOn": { "enum": ["Never", "OnFirstAnswer", "HighConfidence"], "default": "Never" }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+
+    "ParallelNode": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseNode" },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "const": "parallel" },
+            "data": {
+              "type": "object",
+              "required": ["mode"],
+              "properties": {
+                "mode": { "enum": ["items", "branches"] },
+                "concurrency": { "type": "integer", "minimum": 1, "default": 8 },
+                "timeoutSec": { "type": "number", "minimum": 0, "default": 60 },
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "itemPath": { "type": "string", "description": "JSONPath to array for fan-out (e.g., $.rows)" }
+                  }
+                },
+                "branches": {
+                  "type": "object",
+                  "properties": {
+                    "children": { "type": "array", "items": { "type": "string" } },
+                    "broadcast": { "type": "array", "items": { "type": "string" }, "description": "Input field names to broadcast to all children (e.g., ['messages','context'])." }
+                  }
+                },
+                "join": {
+                  "type": "object",
+                  "properties": {
+                    "waitFor": { "enum": ["all", "firstN", "firstBest"], "default": "all" },
+                    "n": { "type": "integer", "minimum": 1 },
+                    "onTimeout": { "enum": ["partial", "fail"], "default": "partial" }
+                  }
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+
+    "ReducerNode": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseNode" },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "const": "reducer" },
+            "data": {
+              "type": "object",
+              "properties": {
+                "fields": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["target", "strategy"],
+                    "properties": {
+                      "target": { "type": "string" },
+                      "strategy": { "enum": ["list_concat", "dict_merge_shallow", "dict_merge_deep", "sum", "min", "max", "avg", "last_write_wins"] }
+                    }
+                  }
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+
+    "PublisherNode": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseNode" },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "const": "publisher" },
+            "data": {
+              "type": "object",
+              "properties": {
+                "sink": { "enum": ["sharepoint", "webhook", "email", "blob"] },
+                "args": { "type": "object", "additionalProperties": true }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+
+    "OutputNode": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseNode" },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "const": "output" },
+            "data": {
+              "type": "object",
+              "properties": {
+                "schemaRef": { "type": "string", "description": "Schema of the final payload returned to the caller." }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+
+    "CodelessAgentNode": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseNode" },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "const": "agent.codeless" },
+            "data": {
+              "type": "object",
+              "required": ["systemInstructions", "model"],
+              "properties": {
+                "systemInstructions": { "type": "string" },
+                "styleGuide": { "type": "string" },
+                "model": {
+                  "type": "object",
+                  "required": ["provider", "modelId"],
+                  "properties": {
+                    "provider": { "enum": ["openai", "azureopenai", "bedrock", "ollama", "other"] },
+                    "modelId": { "type": "string" },
+                    "temperature": { "type": "number", "minimum": 0, "maximum": 2, "default": 0 },
+                    "topP": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+                    "maxTokens": { "type": "integer", "minimum": 1 },
+                    "seed": { "type": ["integer", "null"] },
+                    "stop": { "type": "array", "items": { "type": "string" } },
+                    "jsonModeEnabled": { "type": "boolean", "default": false }
+                  },
+                  "additionalProperties": true
+                },
+                "context": {
+                  "type": "object",
+                  "properties": {
+                    "vars": { "type": "object", "additionalProperties": { "type": "string" } },
+                    "injectOrgPreamble": { "type": "boolean", "default": false }
+                  },
+                  "additionalProperties": true
+                },
+                "historyPolicy": { "$ref": "#/$defs/HistoryPolicy" },
+                "tools": {
+                  "type": "object",
+                  "properties": {
+                    "policy": { "enum": ["Disabled", "Auto", "AlwaysAsk", "Heuristic"], "default": "Auto" },
+                    "timeoutMs": { "type": "integer", "minimum": 0 },
+                    "maxCallsPerTurn": { "type": "integer", "minimum": 0 },
+                    "parallelism": { "type": "integer", "minimum": 1, "default": 1 },
+                    "redactPII": { "type": "boolean", "default": true },
+                    "attached": { "type": "array", "items": { "type": "string" }, "description": "Tool ids allowed for this agent." }
+                  },
+                  "additionalProperties": true
+                },
+                "structuredOutput": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": { "type": "boolean", "default": false },
+                    "schemaRef": { "type": "string" },
+                    "onViolation": { "enum": ["RetryAndRepair", "ReturnError", "BestEffort"], "default": "RetryAndRepair" },
+                    "maxRepairAttempts": { "type": "integer", "minimum": 0, "default": 2 }
+                  },
+                  "additionalProperties": true
+                },
+                "safety": {
+                  "type": "object",
+                  "properties": {
+                    "policyRef": { "type": "string" },
+                    "onBlock": { "enum": ["Refuse", "SafeAgent", "AskForClarification"], "default": "Refuse" },
+                    "safeAgentRef": { "type": "string" },
+                    "promptInjectionDefense": { "type": "boolean", "default": true },
+                    "piiRedaction": { "type": "boolean", "default": true }
+                  },
+                  "additionalProperties": true
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+
+    "ToolNode": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseNode" },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "const": "tool" },
+            "data": {
+              "type": "object",
+              "required": ["toolId"],
+              "properties": {
+                "name": { "type": "string" },
+                "toolId": { "type": "string" },
+                "version": { "type": "string" },
+                "argsSchema": { "type": "object" },
+                "parameterOverrides": { "type": "object", "additionalProperties": true }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+
+    "MCPServerNode": {
+      "allOf": [
+        { "$ref": "#/$defs/BaseNode" },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "const": "mcpServer" },
+            "data": {
+              "type": "object",
+              "properties": {
+                "url": { "type": "string" },
+                "protocol": { "type": "string" },
+                "auth": {
+                  "type": "object",
+                  "properties": {
+                    "type": { "enum": ["OBO", "client_credentials", "api_key", "mtls"] },
+                    "scopes": { "type": "array", "items": { "type": "string" } },
+                    "secretRef": { "type": ["string", "null"] }
+                  }
+                },
+                "capabilities": {
+                  "type": "object",
+                  "properties": {
+                    "tools": { "type": "boolean" },
+                    "resources": { "type": "boolean" },
+                    "prompts": { "type": "boolean" },
+                    "sampling": { "type": "boolean" }
+                  }
+                },
+                "namespaceFilter": { "type": "array", "items": { "type": "string" } },
+                "metadata": { "type": "object" }
+              },
+              "required": ["url", "protocol"],
+              "additionalProperties": true
+            }
+          }
+        }
+      ]
+    },
+
+    "Transform": {
+      "oneOf": [
+        { "type": "string", "enum": ["identity", "to_number", "to_string", "to_boolean", "wrap_array", "unwrap_singleton", "lower", "upper", "trim"] },
+        {
+          "type": "object",
+          "properties": {
+            "merge": { "type": "object", "additionalProperties": true },
+            "regex_replace": { "type": "object", "properties": { "pattern": { "type": "string" }, "replace": { "type": "string" } } },
+            "clamp": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+
+    "Validator": {
+      "oneOf": [
+        { "type": "object", "properties": { "type": { "const": "required" } }, "required": ["type"] },
+        { "type": "object", "properties": { "type": { "const": "min" }, "value": { "type": "number" } }, "required": ["type","value"] },
+        { "type": "object", "properties": { "type": { "const": "max" }, "value": { "type": "number" } }, "required": ["type","value"] },
+        { "type": "object", "properties": { "type": { "const": "enum" }, "values": { "type": "array", "items": { "type": "string" } } }, "required": ["type","values"] }
+      ]
+    },
+
+    "Mapping": {
+      "type": "object",
+      "required": ["from", "to"],
+      "properties": {
+        "from": { "type": "string", "description": "JSONPath on source (node output or state)" },
+        "to": { "type": "string", "description": "Target path in destination node input" },
+        "transform": {
+          "oneOf": [
+            { "$ref": "#/$defs/Transform" },
+            { "type": "array", "items": { "$ref": "#/$defs/Transform" } }
+          ]
+        },
+        "default": {},
+        "validators": { "type": "array", "items": { "$ref": "#/$defs/Validator" } },
+        "reduce": { "enum": ["list_concat", "dict_merge_shallow", "dict_merge_deep", "sum", "min", "max", "avg", "last_write_wins"] }
+      },
+      "additionalProperties": false
+    },
+
+    "Edge": {
+      "type": "object",
+      "required": ["id", "from", "to"],
+      "properties": {
+        "id": { "type": "string" },
+        "from": { "type": "string" },
+        "to": { "type": "string" },
+        "label": { "type": "string" },
+        "mapping": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Mapping" }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "HistoryPolicy": {
+      "type": "object",
+      "properties": {
+        "window": {
+          "type": "object",
+          "properties": {
+            "strategy": { "enum": ["token_budget", "lastN", "time_bounded"], "default": "token_budget" },
+            "budgetTokens": { "type": "integer", "minimum": 1, "default": 4096 },
+            "lastN": { "type": "integer", "minimum": 0, "default": 6 },
+            "timeRangeMs": { "type": ["integer","null"], "minimum": 0 }
+          },
+          "additionalProperties": true
+        },
+        "include": {
+          "type": "object",
+          "properties": {
+            "roles": { "type": "array", "items": { "enum": ["system","user","assistant","tool","other"] }, "default": ["system","user","assistant"] },
+            "toolCalls": {
+              "type": "object",
+              "properties": {
+                "previousTurns": { "type": "boolean", "default": false },
+                "currentTurn": { "type": "boolean", "default": false },
+                "mode": { "enum": ["summary", "arguments_only", "results_only", "full"], "default": "summary" }
+              }
+            },
+            "interAgent": {
+              "type": "object",
+              "properties": {
+                "previousTurns": { "type": "boolean", "default": false },
+                "currentTurn": { "type": "boolean", "default": false },
+                "channels": { "type": "array", "items": { "type": "string" }, "default": ["*"] }
+              }
+            },
+            "attachments": { "enum": ["references", "inline_small", "none"], "default": "references" }
+          },
+          "additionalProperties": true
+        },
+        "selection": {
+          "type": "object",
+          "properties": {
+            "strategy": { "enum": ["window", "relevance", "hybrid"], "default": "hybrid" },
+            "topK": { "type": "integer", "minimum": 1, "default": 8 },
+            "threshold": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.2 },
+            "retrieverRef": { "type": ["string","null"], "default": null }
+          },
+          "additionalProperties": true
+        },
+        "summarize": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "targetTokens": { "type": "integer", "minimum": 1, "default": 800 },
+            "modelRef": { "type": "string", "default": "gpt-4o-mini" }
+          }
+        },
+        "redact": {
+          "type": "object",
+          "properties": {
+            "pii": { "type": "boolean", "default": true },
+            "secrets": { "type": "boolean", "default": true },
+            "patterns": { "type": "array", "items": { "type": "string" }, "default": [] },
+            "fields": { "type": "array", "items": { "type": "string" }, "default": [] }
+          }
+        },
+        "dedupe": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "by": { "type": "array", "items": { "type": "string" }, "default": ["content_hash"] }
+          }
+        },
+        "maxContextTokens": { "type": "integer", "minimum": 1, "default": 8192 }
+      },
+      "additionalProperties": true
+    },
+
+    "Node": {
+      "oneOf": [
+        { "$ref": "#/$defs/EntryChatFormNode" },
+        { "$ref": "#/$defs/RouterNode" },
+        { "$ref": "#/$defs/SequentialNode" },
+        { "$ref": "#/$defs/ParallelNode" },
+        { "$ref": "#/$defs/ReducerNode" },
+        { "$ref": "#/$defs/PublisherNode" },
+        { "$ref": "#/$defs/OutputNode" },
+        { "$ref": "#/$defs/CodelessAgentNode" },
+        { "$ref": "#/$defs/ToolNode" },
+        { "$ref": "#/$defs/MCPServerNode" }
+      ]
+    }
+  }
+}
