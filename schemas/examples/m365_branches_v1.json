@@ -1,0 +1,93 @@
+{
+  "meta": { "id": "m365_branches_v1", "name": "M365 Parallel Branches", "version": "1.0.0" },
+  "entryId": "n_entry",
+  "schemas": {
+    "Evidence": {
+      "type": "object",
+      "required": ["answer_snippet","sources"],
+      "properties": {
+        "answer_snippet": { "type": "string" },
+        "sources": { "type": "array", "items": { "type": "string", "format": "uri" } },
+        "score": { "type": "number" }
+      }
+    },
+    "EvidenceArray": { "type": "array", "items": { "$ref": "#/schemas/Evidence" } },
+    "Synthesis@1": {
+      "type": "object",
+      "required": ["answer","citations"],
+      "properties": {
+        "answer": { "type": "string" },
+        "citations": { "type": "array", "items": { "type": "string", "format": "uri" } },
+        "merged_sources": { "type": "array", "items": { "type": "string", "format": "uri" } },
+        "confidence": { "type": "number" }
+      }
+    }
+  },
+  "nodes": [
+    { "id": "n_entry", "kind": "entry.chat_form", "label": "Entry: Chat/Form" },
+
+    { "id": "n_parallel", "kind": "parallel", "label": "Branches: SP + OD",
+      "data": { "mode": "branches", "concurrency": 2, "branches": { "children": ["n_sp","n_od"], "broadcast": ["messages","context"] },
+                "join": { "waitFor": "all", "onTimeout": "partial" } } },
+
+    { "id": "n_sp", "kind": "agent.codeless", "label": "SharePoint Agent",
+      "data": {
+        "systemInstructions": "Search SharePoint and return Evidence[].",
+        "model": { "provider": "openai", "modelId": "gpt-4o-mini" },
+        "tools": { "policy": "Auto", "attached": ["policy.search"] },
+        "structuredOutput": { "enabled": true, "schemaRef": "#/schemas/EvidenceArray" }
+      }
+    },
+
+    { "id": "n_od", "kind": "agent.codeless", "label": "OneDrive Agent",
+      "data": {
+        "systemInstructions": "Search OneDrive and return Evidence[].",
+        "model": { "provider": "openai", "modelId": "gpt-4o-mini" },
+        "tools": { "policy": "Auto", "attached": ["policy.search"] },
+        "structuredOutput": { "enabled": true, "schemaRef": "#/schemas/EvidenceArray" }
+      }
+    },
+
+    { "id": "n_comb", "kind": "agent.codeless", "label": "Combiner Agent",
+      "data": {
+        "systemInstructions": "Synthesize a single answer from multi-connector Evidence[]. Include merged citations.",
+        "model": { "provider": "openai", "modelId": "gpt-4o-mini", "temperature": 0 },
+        "tools": { "policy": "Disabled", "attached": [] },
+        "structuredOutput": { "enabled": true, "schemaRef": "#/schemas/Synthesis@1" },
+        "historyPolicy": { "include": { "interAgent": { "previousTurns": true } } }
+      }
+    },
+
+    { "id": "n_out", "kind": "output", "label": "Output", "data": { "schemaRef": "#/schemas/Synthesis@1" } }
+  ],
+  "edges": [
+    { "id": "e1", "from": "n_entry", "to": "n_parallel",
+      "mapping": [
+        { "from": "$.messages", "to": "broadcast.messages" },
+        { "from": "$.form.values", "to": "broadcast.context" }
+      ]
+    },
+
+    { "id": "e2", "from": "n_parallel", "to": "n_sp",
+      "mapping": [
+        { "from": "$.broadcast.messages", "to": "messages" },
+        { "from": "$.broadcast.context", "to": "context", "transform": [ { "merge": { "connector": "sharepoint" } } ] }
+      ]
+    },
+
+    { "id": "e3", "from": "n_parallel", "to": "n_od",
+      "mapping": [
+        { "from": "$.broadcast.messages", "to": "messages" },
+        { "from": "$.broadcast.context", "to": "context", "transform": [ { "merge": { "connector": "onedrive" } } ] }
+      ]
+    },
+
+    { "id": "e4", "from": "n_sp", "to": "n_comb",
+      "mapping": [ { "from": "$", "to": "evidence", "transform": "wrap_array", "reduce": "list_concat" } ] },
+    { "id": "e5", "from": "n_od", "to": "n_comb",
+      "mapping": [ { "from": "$", "to": "evidence", "transform": "wrap_array", "reduce": "list_concat" } ] },
+
+    { "id": "e6", "from": "n_comb", "to": "n_out",
+      "mapping": [ { "from": "$", "to": "$" } ] }
+  ]
+}

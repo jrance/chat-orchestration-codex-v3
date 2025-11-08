@@ -1,0 +1,64 @@
+{
+  "meta": { "id": "policy_sequential_v1", "name": "Policy (Sequential)", "version": "1.0.0" },
+  "entryId": "n_entry",
+  "schemas": {
+    "Evidence": {
+      "type": "object",
+      "required": ["answer_snippet","sources"],
+      "properties": {
+        "answer_snippet": { "type": "string" },
+        "sources": { "type": "array", "items": { "type": "string", "format": "uri" } },
+        "score": { "type": "number" }
+      }
+    },
+    "EvidenceArray": { "type": "array", "items": { "$ref": "#/schemas/Evidence" } },
+    "Synthesis@1": {
+      "type": "object",
+      "required": ["answer","citations"],
+      "properties": {
+        "answer": { "type": "string" },
+        "citations": { "type": "array", "items": { "type": "string", "format": "uri" } },
+        "confidence": { "type": "number" }
+      }
+    }
+  },
+  "nodes": [
+    { "id": "n_entry", "kind": "entry.chat_form", "label": "Entry: Chat" },
+
+    { "id": "n_seq", "kind": "sequential", "label": "Sequential", "data": { "childrenOrder": ["n_ret","n_ans"] } },
+
+    { "id": "n_ret", "kind": "agent.codeless", "label": "Retriever Agent",
+      "data": {
+        "systemInstructions": "Retrieve the most relevant policy passages (no final answer). Output Evidence[].",
+        "model": { "provider": "openai", "modelId": "gpt-4o-mini", "temperature": 0 },
+        "tools": { "policy": "Auto", "attached": ["policy.search"] },
+        "structuredOutput": { "enabled": true, "schemaRef": "#/schemas/EvidenceArray" }
+      }
+    },
+
+    { "id": "n_ans", "kind": "agent.codeless", "label": "Answer Agent",
+      "data": {
+        "systemInstructions": "Write the final answer grounded only in provided Evidence[]. Include citations.",
+        "model": { "provider": "openai", "modelId": "gpt-4o-mini", "temperature": 0 },
+        "tools": { "policy": "Disabled", "attached": [] },
+        "structuredOutput": { "enabled": true, "schemaRef": "#/schemas/Synthesis@1" }
+      }
+    },
+
+    { "id": "n_out", "kind": "output", "label": "Output", "data": { "schemaRef": "#/schemas/Synthesis@1" } }
+  ],
+  "edges": [
+    { "id": "e1", "from": "n_entry", "to": "n_ret",
+      "mapping": [ { "from": "$.messages", "to": "messages" } ] },
+
+    { "id": "e2", "from": "n_ret", "to": "n_ans",
+      "mapping": [
+        { "from": "$", "to": "evidence" },
+        { "from": "$.messages", "to": "messages", "default": [] }
+      ]
+    },
+
+    { "id": "e3", "from": "n_ans", "to": "n_out",
+      "mapping": [ { "from": "$", "to": "$" } ] }
+  ]
+}

@@ -1,0 +1,277 @@
+{
+  "$id": "https://example.com/agent-builder/toolkit.schema.v1_0.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent Builder Toolkit (v1.0 – core tools)",
+  "type": "object",
+  "required": ["meta", "tools"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["id", "name", "version"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "labels": { "type": "object", "additionalProperties": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+
+    "schemas": {
+      "description": "Reusable JSON Schemas for tool args/outputs (FileRef, Row, RowResult, Evidence, etc.)",
+      "type": "object",
+      "additionalProperties": { "type": "object" }
+    },
+
+    "authProfiles": {
+      "description": "Named auth profiles reusable by HTTP/MCP transports.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/AuthProfile" }
+    },
+
+    "tools": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ToolSpec" }
+    }
+  },
+
+  "$defs": {
+    "ToolSpec": {
+      "type": "object",
+      "required": ["id", "name", "version", "deterministic", "transport", "argsSchemaRef", "outputSchemaRef"],
+      "properties": {
+        "id": { "type": "string", "description": "Stable tool identifier (e.g., 'xlsx.parse')." },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "description": { "type": "string" },
+        "labels": { "type": "object", "additionalProperties": { "type": "string" } },
+
+        "deterministic": { "type": "boolean", "description": "True if output only depends on input args." },
+        "llmBacked": { "type": "boolean", "default": false, "description": "True if this tool internally calls an LLM." },
+        "sideEffects": { "type": "boolean", "default": false, "description": "True if the tool mutates external state (uploads, writes, etc.)." },
+        "idempotent": { "type": "boolean", "default": true },
+
+        "argsSchemaRef": { "type": "string" },
+        "outputSchemaRef": { "type": "string" },
+
+        "transport": { "$ref": "#/$defs/Transport" },
+        "timeoutMs": { "type": "integer", "minimum": 0, "default": 10000 },
+        "rateLimit": { "$ref": "#/$defs/RateLimit" },
+        "retry": { "$ref": "#/$defs/RetryPolicy" },
+        "cache": { "$ref": "#/$defs/CachePolicy" },
+        "privacy": { "$ref": "#/$defs/PrivacyPolicy" },
+
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "args": { "type": "object" },
+              "output": { "type": "object" }
+            }
+          },
+          "argPolicies": {
+            "description": "Per-argument policies for LLM exposure, runtime resolution, and telemetry.",
+            "type": "array",
+            "items": { "$ref": "#/$defs/ArgPolicy" }
+          }
+        },
+
+        "telemetry": {
+          "type": "object",
+          "properties": {
+            "emitArgs": { "type": "boolean", "default": false },
+            "emitResult": { "type": "boolean", "default": false },
+            "redactPaths": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "Transport": {
+      "oneOf": [
+        { "$ref": "#/$defs/HttpTransport" },
+        { "$ref": "#/$defs/McpTransport" },
+        { "$ref": "#/$defs/NativeTransport" }
+      ]
+    },
+
+    "HttpTransport": {
+      "type": "object",
+      "required": ["type", "method", "urlTemplate"],
+      "properties": {
+        "type": { "const": "http" },
+        "method": { "enum": ["GET","POST","PUT","PATCH","DELETE"] },
+        "urlTemplate": { "type": "string", "description": "May include {placeholders} resolved from args." },
+        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+        "query": { "type": "object", "additionalProperties": { "type": ["string","number","boolean"] } },
+        "body": { "type": ["object","string","null"] },
+        "authProfileId": { "type": "string" },
+        "pagination": {
+          "type": "object",
+          "properties": {
+            "cursorParam": { "type": "string" },
+            "pageSizeParam": { "type": "string" },
+            "pageSize": { "type": "integer", "minimum": 1 },
+            "nextCursorPath": { "type": "string", "description": "JSONPath to find next cursor in response." },
+            "itemsPath": { "type": "string", "description": "JSONPath to items array in response." }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "McpTransport": {
+      "type": "object",
+      "required": ["type", "serverRef", "mcpTool"],
+      "properties": {
+        "type": { "const": "mcp" },
+        "serverRef": { "type": "string", "description": "ID of MCP server node/entry." },
+        "mcpTool": { "type": "string", "description": "Tool name exposed by MCP server." },
+        "authProfileId": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+
+    "NativeTransport": {
+      "type": "object",
+      "required": ["type", "entryPoint"],
+      "properties": {
+        "type": { "const": "native" },
+        "entryPoint": { "type": "string", "description": "e.g., 'app.tools.xlsx:parse' (module:function)" }
+      },
+      "additionalProperties": true
+    },
+
+    "RateLimit": {
+      "type": "object",
+      "properties": {
+        "qps": { "type": "number", "minimum": 0 },
+        "burst": { "type": "integer", "minimum": 0 },
+        "concurrency": { "type": "integer", "minimum": 1 }
+      }
+    },
+
+    "RetryPolicy": {
+      "type": "object",
+      "properties": {
+        "maxAttempts": { "type": "integer", "minimum": 0, "default": 2 },
+        "backoff": { "enum": ["none","fixed","exponential"], "default": "exponential" },
+        "initialDelayMs": { "type": "integer", "minimum": 0, "default": 200 },
+        "maxDelayMs": { "type": "integer", "minimum": 0, "default": 2000 },
+        "retryOn": { "type": "array", "items": { "type": "integer" }, "description": "HTTP statuses or MCP/native error codes." }
+      }
+    },
+
+    "CachePolicy": {
+      "type": "object",
+      "properties": {
+        "mode": { "enum": ["off","memory","distributed"], "default": "off" },
+        "ttlSec": { "type": "integer", "minimum": 0 },
+        "keyPath": { "type": "string", "description": "JSONPath over args to build cache key." }
+      }
+    },
+
+    "PrivacyPolicy": {
+      "type": "object",
+      "properties": {
+        "redactPaths": { "type": "array", "items": { "type": "string" } },
+        "dropFields": { "type": "array", "items": { "type": "string" } },
+        "pii": { "type": "boolean", "default": true },
+        "secrets": { "type": "boolean", "default": true }
+      }
+    },
+
+    "ArgPolicy": {
+    "type": "object",
+    "required": ["path"],
+    "properties": {
+        "path": {
+        "type": "string",
+        "description": "JSON Pointer or dot-path to an arg (e.g., '/artifact/file_id' or 'artifact.file_id')."
+        },
+
+        "llmVisibility": {
+        "description": "How this field appears in LLM-exposed tool schema & prompts.",
+        "enum": ["full", "placeholder", "name_only", "hidden"],
+        "default": "full"
+        },
+        "placeholder": {
+        "type": "string",
+        "description": "If llmVisibility=placeholder, the literal shown to the LLM (e.g., '<file_ref>')."
+        },
+
+        "requiredAtRuntime": {
+        "type": "boolean",
+        "default": false,
+        "description": "If true, engine must resolve/populate this before invocation even if omitted by LLM."
+        },
+
+        "source": {
+        "description": "Where the runtime gets the value if LLM doesn't supply it (or it's hidden).",
+        "enum": ["user", "context", "secret", "authProfile", "computed"]
+        },
+        "resolver": {
+        "description": "How to compute/fetch the value at runtime (context path, secret ref, expression, etc.).",
+        "oneOf": [
+            { "type": "string" },
+            {
+            "type": "object",
+            "properties": {
+                "contextPath": { "type": "string" },
+                "secretRef": { "type": "string" },
+                "authProfileField": { "type": "string" },
+                "expr": { "type": "string", "description": "Expression language if you support it." }
+            }
+            }
+        ]
+        },
+
+        "telemetry": {
+        "description": "How this field appears in logs/SSE.",
+        "enum": ["full", "redact", "hash", "none"],
+        "default": "redact"
+        }
+    },
+    
+    "additionalProperties": false
+    },
+
+    "AuthProfile": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "enum": ["oauth2","api_key","mtls","none"] },
+        "oauth2": {
+          "type": "object",
+          "properties": {
+            "issuer": { "type": "string" },
+            "tokenUrl": { "type": "string" },
+            "audience": { "type": "string" },
+            "clientIdSecretRef": { "type": "string" },
+            "clientSecretRef": { "type": "string" },
+            "scopes": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "apiKey": {
+          "type": "object",
+          "properties": {
+            "header": { "type": "string", "default": "Authorization" },
+            "prefix": { "type": "string", "default": "Bearer " },
+            "secretRef": { "type": "string" }
+          }
+        },
+        "mtls": {
+          "type": "object",
+          "properties": {
+            "certRef": { "type": "string" },
+            "keyRef": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

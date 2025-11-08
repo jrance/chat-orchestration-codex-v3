@@ -1,0 +1,261 @@
+{
+  "meta": { "id": "toolkit-core", "name": "Toolkit – Core", "version": "1.0.0" },
+
+  "schemas": {
+    "FileRef": {
+      "type": "object",
+      "required": ["file_id","mime_type","display_name"],
+      "properties": {
+        "file_id": { "type": "string" },
+        "mime_type": { "type": "string" },
+        "display_name": { "type": "string" },
+        "size": { "type": "integer" }
+      }
+    },
+
+    "Row": { "type": "object", "additionalProperties": true },
+
+    "RowArray": { "type": "array", "items": { "$ref": "#/schemas/Row" } },
+
+    "RowResult": {
+      "type": "object",
+      "required": ["row_id","status","findings","summary","sources"],
+      "properties": {
+        "row_id": { "type": "integer" },
+        "status": { "enum": ["ok","warn","error"] },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["field","message"],
+            "properties": {
+              "field": { "type": "string" },
+              "message": { "type": "string" },
+              "expected": { "type": "string" },
+              "actual": { "type": "string" }
+            }
+          }
+        },
+        "summary": { "type": "string" },
+        "sources": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "RowResultArray": { "type": "array", "items": { "$ref": "#/schemas/RowResult" } },
+
+    "Evidence": {
+      "type": "object",
+      "required": ["answer_snippet","sources"],
+      "properties": {
+        "answer_snippet": { "type": "string" },
+        "sources": { "type": "array", "items": { "type": "string", "format": "uri" } },
+        "score": { "type": "number" }
+      }
+    },
+
+    "EvidenceArray": { "type": "array", "items": { "$ref": "#/schemas/Evidence" } },
+
+    "Synthesis": {
+      "type": "object",
+      "required": ["answer","citations"],
+      "properties": {
+        "answer": { "type": "string" },
+        "citations": { "type": "array", "items": { "type": "string", "format": "uri" } },
+        "merged_sources": { "type": "array", "items": { "type": "string", "format": "uri" } },
+        "confidence": { "type": "number" }
+      }
+    }
+  },
+
+  "authProfiles": [
+    { "id": "news-api", "kind": "api_key", "apiKey": { "header": "Authorization", "prefix": "Bearer ", "secretRef": "secrets.NEWS_API_KEY" } },
+    { "id": "sharepoint", "kind": "oauth2", "oauth2": { "issuer": "https://login.microsoftonline.com/{tenant}", "tokenUrl": "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token", "audience": "https://graph.microsoft.com", "clientIdSecretRef": "secrets.SP_CLIENT_ID", "clientSecretRef": "secrets.SP_CLIENT_SECRET", "scopes": ["https://graph.microsoft.com/.default"] } }
+  ],
+
+  "tools": [
+    {
+      "id": "xlsx.parse",
+      "name": "Parse XLSX",
+      "version": "1.0.0",
+      "description": "Parse an Excel workbook into rows.",
+      "deterministic": true,
+      "llmBacked": false,
+      "sideEffects": false,
+      "idempotent": true,
+      "argsSchemaRef": "#/schemas/FileRef",
+      "outputSchemaRef": "#/schemas/RowArray",
+      "transport": { "type": "native", "entryPoint": "app.tools.xlsx:parse" },
+      "timeoutMs": 15000
+    },
+
+    {
+      "id": "report.build_csv",
+      "name": "Build CSV Report",
+      "version": "1.0.0",
+      "description": "Render row results into a CSV artifact.",
+      "deterministic": true,
+      "llmBacked": false,
+      "sideEffects": false,
+      "idempotent": true,
+      "argsSchemaRef": "#/schemas/RowResultArray",
+      "outputSchemaRef": "#/schemas/FileRef",
+      "transport": { "type": "native", "entryPoint": "app.tools.report:build_csv" },
+      "timeoutMs": 10000
+    },
+
+    {
+      "id": "s3.list",
+      "name": "S3 List",
+      "version": "1.0.0",
+      "description": "List object keys under a prefix.",
+      "deterministic": true,
+      "llmBacked": false,
+      "sideEffects": false,
+      "idempotent": true,
+      "argsSchemaRef": "#/schemas/S3ListArgs",
+      "outputSchemaRef": "#/schemas/S3ListOut",
+      "transport": { "type": "native", "entryPoint": "app.tools.s3:list" },
+      "timeoutMs": 8000
+    },
+    {
+      "id": "s3.get_text",
+      "name": "S3 Get Text",
+      "version": "1.0.0",
+      "description": "Return plaintext content from an object.",
+      "deterministic": true,
+      "llmBacked": false,
+      "sideEffects": false,
+      "idempotent": true,
+      "argsSchemaRef": "#/schemas/S3GetArgs",
+      "outputSchemaRef": "#/schemas/S3GetOut",
+      "transport": { "type": "native", "entryPoint": "app.tools.s3:get_text" },
+      "timeoutMs": 12000
+    },
+
+    {
+      "id": "policy.search",
+      "name": "Policy Search",
+      "version": "1.0.0",
+      "description": "Enterprise policy search (RAG retriever).",
+      "deterministic": true,
+      "llmBacked": false,
+      "sideEffects": false,
+      "idempotent": true,
+      "argsSchemaRef": "#/schemas/SearchArgs",
+      "outputSchemaRef": "#/schemas/EvidenceArray",
+      "transport": {
+        "type": "http",
+        "method": "GET",
+        "urlTemplate": "https://policy.example.com/v1/search",
+        "query": { "q": "{query}", "topK": "{topK}", "timeRange": "{timeRange}" }
+      },
+      "authProfileId": "policy-service",
+      "timeoutMs": 6000,
+      "rateLimit": { "qps": 10, "burst": 20, "concurrency": 4 },
+      "retry": { "maxAttempts": 2, "backoff": "exponential", "retryOn": [429,500,502,503,504] }
+    },
+
+    {
+      "id": "news.search",
+      "name": "News Search",
+      "version": "1.0.0",
+      "description": "News/web search (supports time range & freshness).",
+      "deterministic": true,
+      "llmBacked": false,
+      "sideEffects": false,
+      "idempotent": true,
+      "argsSchemaRef": "#/schemas/SearchArgs",
+      "outputSchemaRef": "#/schemas/EvidenceArray",
+      "transport": {
+        "type": "http",
+        "method": "GET",
+        "urlTemplate": "https://news.example.com/v1/search",
+        "headers": { "Authorization": "Bearer {apiKey}" },
+        "query": { "q": "{query}", "topK": "{topK}", "freshness": "{timeRange}" },
+        "pagination": {
+          "cursorParam": "cursor",
+          "pageSizeParam": "limit",
+          "pageSize": 10,
+          "nextCursorPath": "$.nextCursor",
+          "itemsPath": "$.items"
+        }
+      },
+      "authProfileId": "news-api",
+      "timeoutMs": 6000,
+      "rateLimit": { "qps": 5, "burst": 10, "concurrency": 2 },
+      "retry": { "maxAttempts": 2, "backoff": "exponential", "retryOn": [429,500,502,503,504] }
+    },
+
+    {
+      "id": "sharepoint.upload",
+      "name": "SharePoint Upload",
+      "version": "1.0.0",
+      "description": "Upload an artifact to SharePoint; return a URL.",
+      "deterministic": false,
+      "llmBacked": false,
+      "sideEffects": true,
+      "idempotent": false,
+      "argsSchemaRef": "#/schemas/SharePointUploadArgs",
+      "outputSchemaRef": "#/schemas/SharePointUploadOut",
+      "transport": {
+        "type": "http",
+        "method": "PUT",
+        "urlTemplate": "https://graph.microsoft.com/v1.0/sites/{siteId}/drives/{driveId}/root:/{path}:/content",
+        "headers": { "Content-Type": "{mime_type}" },
+        "body": "{artifact_bytes}"
+      },
+      "authProfileId": "sharepoint",
+      "timeoutMs": 20000,
+      "rateLimit": { "qps": 2, "burst": 4, "concurrency": 1 },
+      "retry": { "maxAttempts": 3, "backoff": "exponential", "retryOn": [429,500,502,503,504] },
+      "privacy": { "redactPaths": ["$.body"] }
+    }
+  ],
+
+  "schemasExt": {
+    "S3ListArgs": {
+      "type": "object",
+      "required": ["prefix"],
+      "properties": { "prefix": { "type": "string" }, "limit": { "type": "integer", "minimum": 1, "default": 10 } }
+    },
+    "S3ListOut": {
+      "type": "object",
+      "required": ["keys"],
+      "properties": { "keys": { "type": "array", "items": { "type": "string" } } }
+    },
+    "S3GetArgs": { "type": "object", "required": ["key"], "properties": { "key": { "type": "string" } } },
+    "S3GetOut": {
+      "type": "object",
+      "required": ["key","text"],
+      "properties": { "key": { "type": "string" }, "text": { "type": "string" }, "bytes": { "type": ["string","null"], "description": "Optional base64 if needed" } }
+    },
+
+    "SearchArgs": {
+      "type": "object",
+      "required": ["query"],
+      "properties": {
+        "query": { "type": "string" },
+        "topK": { "type": "integer", "minimum": 1, "default": 5 },
+        "timeRange": { "type": "string", "description": "e.g., 'd','w','m' or absolute range" }
+      }
+    },
+
+    "SharePointUploadArgs": {
+      "type": "object",
+      "required": ["artifact","siteId","driveId","path"],
+      "properties": {
+        "artifact": { "$ref": "#/schemas/FileRef" },
+        "siteId": { "type": "string" },
+        "driveId": { "type": "string" },
+        "path": { "type": "string" },
+        "mime_type": { "type": "string" },
+        "metadata": { "type": "object" }
+      }
+    },
+    "SharePointUploadOut": {
+      "type": "object",
+      "required": ["url"],
+      "properties": { "url": { "type": "string", "format": "uri" }, "itemId": { "type": "string" } }
+    }
+  }
+}
