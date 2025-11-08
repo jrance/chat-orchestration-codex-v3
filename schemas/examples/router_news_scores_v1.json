@@ -1,0 +1,65 @@
+{
+  "meta": { "id": "router_news_scores_v1", "name": "Router: News or Scores", "version": "1.0.0" },
+  "entryId": "n_entry",
+  "schemas": {
+    "Synthesis@1": {
+      "type": "object",
+      "required": ["answer","citations"],
+      "properties": {
+        "answer": { "type": "string" },
+        "citations": { "type": "array", "items": { "type": "string", "format": "uri" } },
+        "confidence": { "type": "number" }
+      }
+    },
+    "RouteSchema": {
+      "type": "object",
+      "properties": { "target": { "enum": ["news","scores"] }, "confidence": { "type": "number" } }
+    }
+  },
+  "nodes": [
+    { "id": "n_entry", "kind": "entry.chat_form", "label": "Entry: Chat" },
+
+    { "id": "n_router", "kind": "router", "label": "Supervisor (LLM)",
+      "data": {
+        "mode": "llm",
+        "prompt": "Decide whether this query is about NEWS or SPORTS SCORES.",
+        "minConfidence": 0.0,
+        "targets": ["n_news","n_scores"],
+        "routeSchema": { "$ref": "#/schemas/RouteSchema" },
+        "fallback": { "mode": "DefaultChild", "defaultChild": "n_news" }
+      }
+    },
+
+    { "id": "n_news", "kind": "agent.codeless", "label": "News Agent",
+      "data": {
+        "systemInstructions": "News queries. Use news.search; cite sources.",
+        "model": { "provider": "openai", "modelId": "gpt-4o-mini" },
+        "tools": { "policy": "Auto", "attached": ["news.search"] },
+        "structuredOutput": { "enabled": true, "schemaRef": "#/schemas/Synthesis@1" }
+      }
+    },
+
+    { "id": "n_scores", "kind": "agent.codeless", "label": "Scores Agent",
+      "data": {
+        "systemInstructions": "Sports scores queries. Use scores.search; cite sources.",
+        "model": { "provider": "openai", "modelId": "gpt-4o-mini" },
+        "tools": { "policy": "Auto", "attached": ["scores.search"] },
+        "structuredOutput": { "enabled": true, "schemaRef": "#/schemas/Synthesis@1" }
+      }
+    },
+
+    { "id": "n_out", "kind": "output", "label": "Output", "data": { "schemaRef": "#/schemas/Synthesis@1" } }
+  ],
+  "edges": [
+    { "id": "e1", "from": "n_entry", "to": "n_router",
+      "mapping": [ { "from": "$.messages", "to": "messages" } ] },
+
+    { "id": "e2", "from": "n_router", "to": "n_news",
+      "mapping": [ { "from": "$.messages", "to": "messages" } ] },
+    { "id": "e3", "from": "n_router", "to": "n_scores",
+      "mapping": [ { "from": "$.messages", "to": "messages" } ] },
+
+    { "id": "e4", "from": "n_news", "to": "n_out", "mapping": [ { "from": "$", "to": "$" } ] },
+    { "id": "e5", "from": "n_scores", "to": "n_out", "mapping": [ { "from": "$", "to": "$" } ] }
+  ]
+}

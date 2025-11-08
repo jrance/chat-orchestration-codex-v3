@@ -1,0 +1,145 @@
+{
+  "meta": { "id": "xlsx_validation_v1", "name": "XLSX Data Validation", "version": "1.0.0" },
+  "entryId": "n_entry",
+  "schemas": {
+    "Form@1": {
+      "type": "object",
+      "properties": {
+        "concurrency": { "type": "integer", "minimum": 1, "default": 8 },
+        "upload_to_sharepoint": { "type": "boolean", "default": false },
+        "uploaded_file": {
+          "type": "object",
+          "required": ["file_id","mime_type","display_name"],
+          "properties": {
+            "file_id": { "type": "string" },
+            "mime_type": { "type": "string" },
+            "display_name": { "type": "string" },
+            "size": { "type": "integer" }
+          }
+        }
+      },
+      "required": ["uploaded_file"]
+    },
+    "Row": { "type": "object", "additionalProperties": true },
+    "RowArray": { "type": "array", "items": { "$ref": "#/schemas/Row" } },
+    "RowResult": {
+      "type": "object",
+      "required": ["row_id","status","summary","sources"],
+      "properties": {
+        "row_id": { "type": "integer" },
+        "status": { "enum": ["ok","warn","error"] },
+        "summary": { "type": "string" },
+        "sources": { "type": "array", "items": { "type": "string" } },
+        "findings": { "type": "array", "items": { "type": "object" }, "default": [] }
+      }
+    },
+    "RowResultArray": { "type": "array", "items": { "$ref": "#/schemas/RowResult" } },
+    "ValidationResult@1": {
+      "type": "object",
+      "properties": {
+        "results": { "$ref": "#/schemas/RowResultArray" },
+        "report_url": { "type": ["string","null"], "format": "uri" }
+      }
+    }
+  },
+  "defaults": {
+    "historyPolicy": {
+      "window": { "strategy": "token_budget", "budgetTokens": 4096 },
+      "include": {
+        "roles": ["system","user","assistant"],
+        "toolCalls": { "previousTurns": false, "currentTurn": false, "mode": "summary" },
+        "interAgent": { "previousTurns": false, "currentTurn": false, "channels": ["*"] },
+        "attachments": "references"
+      },
+      "summarize": { "enabled": true, "targetTokens": 800 },
+      "redact": { "pii": true, "secrets": true }
+    }
+  },
+  "nodes": [
+    { "id": "n_entry", "kind": "entry.chat_form", "label": "Entry: Form+File",
+      "data": { "formSchemaRef": "#/schemas/Form@1" } },
+
+    { "id": "n_parse", "kind": "tool", "label": "xlsx.parse",
+      "data": { "toolId": "xlsx.parse" } },
+
+    { "id": "n_parallel", "kind": "parallel", "label": "Fan-out Rows",
+      "data": { "mode": "items", "concurrency": 8, "timeoutSec": 120 } },
+
+    { "id": "n_row_agent", "kind": "agent.codeless", "label": "Row Agent (LLM)",
+      "data": {
+        "systemInstructions": "Validate a single table row against unstructured S3 evidence; return RowResult JSON.",
+        "model": { "provider": "openai", "modelId": "gpt-4o-mini", "temperature": 0 },
+        "tools": { "policy": "Auto", "attached": ["s3.list","s3.get_text"] },
+        "structuredOutput": { "enabled": true, "schemaRef": "#/schemas/RowResult" },
+        "historyPolicy": { "include": { "toolCalls": { "currentTurn": true } } }
+      }
+    },
+
+    { "id": "n_reduce", "kind": "reducer", "label": "Collect Results",
+      "data": { "fields": [ { "target": "results", "strategy": "list_concat" } ] } },
+
+    { "id": "n_report", "kind": "tool", "label": "report.build_csv",
+      "data": { "toolId": "report.build_csv" } },
+
+    { "id": "n_publish", "kind": "publisher", "label": "SharePoint Upload",
+      "data": { "sink": "sharepoint", "args": {} } },
+
+    { "id": "n_out", "kind": "output", "label": "Output",
+      "data": { "schemaRef": "#/schemas/ValidationResult@1" } }
+  ],
+  "edges": [
+    { "id": "e1", "from": "n_entry", "to": "n_parse",
+      "mapping": [
+        { "from": "$.form.values.uploaded_file", "to": "artifact" }
+      ]
+    },
+
+    { "id": "e2", "from": "n_entry", "to": "n_parallel",
+      "mapping": [
+        { "from": "$.form.values.concurrency", "to": "concurrency", "transform": ["to_number", {"clamp":[1,256]}], "default": 8 }
+      ]
+    },
+
+    { "id": "e3", "from": "n_parse", "to": "n_parallel",
+      "mapping": [
+        { "from": "$", "to": "items" } 
+      ]
+    },
+
+    { "id": "e4", "from": "n_parallel", "to": "n_row_agent",
+      "mapping": [
+        { "from": "$", "to": "row" }, 
+        { "from": "$.messages", "to": "messages", "default": [] }
+      ]
+    },
+
+    { "id": "e5", "from": "n_row_agent", "to": "n_reduce",
+      "mapping": [
+        { "from": "$", "to": "results", "transform": "wrap_array", "reduce": "list_concat" }
+      ]
+    },
+
+    { "id": "e6", "from": "n_reduce", "to": "n_report",
+      "mapping": [
+        { "from": "$.results", "to": "$" } 
+      ]
+    },
+
+    { "id": "e7", "from": "n_report", "to": "n_publish",
+      "mapping": [
+        { "from": "$", "to": "artifact" }
+      ]
+    },
+
+    { "id": "e8", "from": "n_reduce", "to": "n_out",
+      "mapping": [
+        { "from": "$.results", "to": "results" }
+      ]
+    },
+    { "id": "e9", "from": "n_publish", "to": "n_out",
+      "mapping": [
+        { "from": "$.url", "to": "report_url" }
+      ]
+    }
+  ]
+}
