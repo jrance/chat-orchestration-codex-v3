@@ -1,0 +1,408 @@
+event: response.created
+data: {
+  "type": "response.created",
+  "status": "in_progress",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "router_id": "router.main"
+}
+
+event: response.telemetry.delta
+data: {
+  "type": "response.telemetry.delta",
+  "channel": "llm",
+  "direction": "request",
+  "provider": "openai",
+  "model": "gpt-4.1",
+  "endpoint": "/v1/responses",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "request_id": "req-01",
+  // body_preview: full prompt & tool schema; redacted auth headers, etc.
+  "body_preview": "{...}"
+}
+
+event: response.route.selected
+data: {
+  "type": "response.route.selected",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "router_id": "router.main",
+  "selection": {
+    "reason": "user asked for latest Ukraine news",
+    "targets": [
+      {"agent_id": "agent.news", "branch_run_id": "run-7f21-a"},
+      {"agent_id": "agent.risk", "branch_run_id": "run-7f21-b"}
+    ]
+  }
+}
+
+event: response.branch.started
+data: {
+  "type": "response.branch.started",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news",
+  "title": "NewsAgent"
+}
+
+event: response.widget.created
+data: {
+  "type": "response.widget.created",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news",
+  "widget_id": "w-news-01",
+  "spec": {
+    "component": "NewsDigestCard",
+    "props": { "items": [], "lastUpdated": null }
+  }
+}
+
+event: response.output_text.created
+data: {
+  "type": "response.output_text.created",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news"
+}
+
+event: response.output_text.delta
+data: {
+  "type": "response.output_text.delta",
+  "delta": "Scanning for credible updates",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news"
+}
+
+event: response.tool_call.created
+data: {
+  "type": "response.tool_call.created",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news",
+  "tool_call_id": "tc-001",
+  "name": "tool:ddgs.search",
+  "function_name": "tool_ddgs_search"
+}
+
+event: response.tool_call.arguments.delta
+data: {
+  "type": "response.tool_call.arguments.delta",
+  "tool_call_id": "tc-001",
+  "index": 0,
+  "arguments": "{\"query\":\"latest Ukraine news\",\"vertical\":\"news\",\"maxResults\":5,\"safesearch\":\"moderate\",\"region\":\"us-en\",\"timeLimit\":\"d\"}",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news"
+}
+
+event: response.tool_call.delta
+data: {
+  "type": "response.tool_call.delta",
+  "tool_call_id": "tc-001",
+  "status": "running",            // <- UI can show “thinking…”
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news"
+}
+
+event: response.tool_result.created
+data: {
+  "type": "response.tool_result.created",
+  "tool_call_id": "tc-001",
+  "name": "tool:ddgs.search",
+  "function_name": "tool_ddgs_search",
+  "redacted": true,               // <- raw payload stored server-side; UI gets preview
+  "result_count": 5,
+  "result_preview": {
+    "type": "object",
+    "keys": ["count", "results", "query", "vertical"],
+    "count": 4
+  },
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news"
+}
+
+event: response.tool_result.done
+data: {
+  "type": "response.tool_result.done",
+  "tool_call_id": "tc-001",
+  "name": "tool:ddgs.search",
+  "function_name": "tool_ddgs_search",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news"
+}
+
+event: response.telemetry.delta
+data: {
+  "type": "response.telemetry.delta",
+  "channel": "llm",
+  "direction": "request",
+  "provider": "openai",
+  "model": "gpt-4.1",
+  "endpoint": "/v1/responses",
+  "request_id": "req-02",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news",
+  // body_preview: assistant synthesis prompt with embedded tool result (redacted PII)
+  "body_preview": "{...}"
+}
+
+event: response.widget.delta
+data: {
+  "type": "response.widget.delta",
+  "widget_id": "w-news-01",
+  "patch": {
+    "op": "append",
+    "path": "/props/items",
+    "value": [
+      { "title": "AP: Power grid strikes", "time": "2025-11-09T10:40Z", "source": "AP" }
+    ]
+  },
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news"
+}
+
+event: response.output_text.delta
+data: {
+  "type": "response.output_text.delta",
+  "delta": "Here are the top verified updates today:",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news"
+}
+
+event: response.widget.delta
+data: {
+  "type": "response.widget.delta",
+  "widget_id": "w-news-01",
+  "patch": {
+    "op": "replace",
+    "path": "/props/lastUpdated",
+    "value": "2025-11-09T08:18:25Z"
+  },
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news"
+}
+
+event: response.output_text.done
+data: {
+  "type": "response.output_text.done",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news"
+}
+
+event: response.widget.done
+data: {
+  "type": "response.widget.done",
+  "widget_id": "w-news-01",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news"
+}
+
+event: response.branch.completed
+data: {
+  "type": "response.branch.completed",
+  "status": "ok",
+  "branch_run_id": "run-7f21-a",
+  "agent_id": "agent.news",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21"
+}
+
+# --- parallel child #2 (RiskAgent) with its own widget ---
+
+event: response.branch.started
+data: {
+  "type": "response.branch.started",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-b",
+  "agent_id": "agent.risk",
+  "title": "RiskAgent"
+}
+
+event: response.widget.created
+data: {
+  "type": "response.widget.created",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-b",
+  "agent_id": "agent.risk",
+  "widget_id": "w-risk-01",
+  "spec": {
+    "component": "RiskBadge",
+    "props": { "level": "evaluating", "notes": [] }
+  }
+}
+
+event: response.output_text.delta
+data: {
+  "type": "response.output_text.delta",
+  "delta": "Assessing operational risk based on latest strikes...",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-b",
+  "agent_id": "agent.risk"
+}
+
+event: response.widget.delta
+data: {
+  "type": "response.widget.delta",
+  "widget_id": "w-risk-01",
+  "patch": { "op": "replace", "path": "/props/level", "value": "elevated" },
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-b",
+  "agent_id": "agent.risk"
+}
+
+event: response.output_text.done
+data: {
+  "type": "response.output_text.done",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-b",
+  "agent_id": "agent.risk"
+}
+
+event: response.widget.done
+data: {
+  "type": "response.widget.done",
+  "widget_id": "w-risk-01",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "branch_run_id": "run-7f21-b",
+  "agent_id": "agent.risk"
+}
+
+event: response.branch.completed
+data: {
+  "type": "response.branch.completed",
+  "status": "ok",
+  "branch_run_id": "run-7f21-b",
+  "agent_id": "agent.risk",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21"
+}
+
+# --- router wraps up / aggregate ---
+
+event: response.aggregate.delta
+data: {
+  "type": "response.aggregate.delta",
+  "summary": "2 branches completed",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "router_id": "router.main"
+}
+
+event: response.telemetry.delta
+data: {
+  "type": "response.telemetry.delta",
+  "channel": "llm",
+  "direction": "response",
+  "provider": "openai",
+  "model": "gpt-4.1",
+  "status_code": 200,
+  "request_id": "req-01",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  // body_preview: token counts, finish_reason, safety blocks, tool_calls echo
+  "body_preview": "{...}"
+}
+
+event: response.completed
+data: {
+  "type": "response.completed",
+  "finish_reason": "stop",
+  "tenant_id": "demo",
+  "orchestration_id": "news_orch_v2",
+  "thread_id": "thread-4b0f",
+  "run_id": "run-7f21",
+  "summary": "NewsAgent + RiskAgent completed with widgets w-news-01, w-risk-01"
+}
+
+# (optional) single-byte terminator if your client expects it:
+event: response.done
+data: {}
