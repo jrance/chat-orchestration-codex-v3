@@ -1,0 +1,84 @@
+{
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  type: "object",
+  properties: {
+    title: {
+      type: "string",
+    },
+    columns: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          key: {
+            type: "string",
+          },
+          label: {
+            type: "string",
+          },
+        },
+        required: ["key", "label"],
+        additionalProperties: false,
+      },
+    },
+    pageRows: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: {
+            type: "string",
+          },
+          cells: {
+            type: "array",
+            items: {
+              type: "string",
+            },
+          },
+        },
+        required: ["id", "cells"],
+        additionalProperties: false,
+      },
+    },
+    pagination: {
+      type: "object",
+      properties: {
+        currentPage: {
+          type: "number",
+        },
+        totalPages: {
+          type: "number",
+        },
+        totalRows: {
+          type: "number",
+        },
+        pageSize: {
+          type: "number",
+        },
+        hasPrev: {
+          type: "boolean",
+        },
+        hasNext: {
+          type: "boolean",
+        },
+        prevPage: {
+          type: "number",
+        },
+        nextPage: {
+          type: "number",
+        },
+      },
+      required: [
+        "currentPage",
+        "totalPages",
+        "totalRows",
+        "pageSize",
+        "hasPrev",
+        "hasNext",
+      ],
+      additionalProperties: false,
+    },
+  },
+  required: ["title", "columns", "pageRows", "pagination"],
+  additionalProperties: false,
+}

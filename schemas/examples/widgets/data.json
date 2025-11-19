@@ -1,0 +1,49 @@
+{
+  title: "Data table",
+  columns: [
+    {
+      key: "id",
+      label: "ID",
+    },
+    {
+      key: "name",
+      label: "Name",
+    },
+    {
+      key: "email",
+      label: "Email",
+    },
+  ],
+  pageRows: [
+    {
+      id: "1",
+      cells: ["1", "Ada Lovelace", "ada@analytical.example"],
+    },
+    {
+      id: "2",
+      cells: ["2", "Alan Turing", "alan@codebreakers.example"],
+    },
+    {
+      id: "3",
+      cells: ["3", "Grace Hopper", "grace@compiler.example"],
+    },
+    {
+      id: "4",
+      cells: ["4", "Katherine Johnson", "kj@nasa.example"],
+    },
+    {
+      id: "5",
+      cells: ["5", "Donald Knuth", "knuth@taocp.example"],
+    },
+  ],
+  pagination: {
+    currentPage: 1,
+    totalPages: 3,
+    totalRows: 12,
+    pageSize: 5,
+    hasPrev: false,
+    hasNext: true,
+    prevPage: 0,
+    nextPage: 2,
+  },
+}

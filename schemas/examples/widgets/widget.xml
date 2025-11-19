@@ -1,0 +1,71 @@
+<Card size="md">
+  <Col gap={2}>
+    <Row>
+      <Title value={title} size="sm" />
+      <Spacer />
+      <Badge label={`${pagination.totalRows} rows`} variant="soft" />
+    </Row>
+
+    <Divider />
+
+    <Col gap={2}>
+      <Row
+        padding={{ x: 3, y: 2 }}
+        background="surface-secondary"
+        radius="sm"
+        align="stretch"
+        gap={3}
+      >
+        {columns.map((col) => (
+          <Col key={col.key} flex={1}>
+            <Caption value={col.label} weight="semibold" />
+          </Col>
+        ))}
+      </Row>
+
+      <ListView>
+        {pageRows.map((row) => (
+          <ListViewItem key={row.id} align="stretch" gap={3}>
+            <Row gap={3} align="stretch" flex="auto">
+              {row.cells.map((cell, idx) => (
+                <Col key={`${row.id}-${idx}`} flex={1}>
+                  <Text value={cell} size="sm" />
+                </Col>
+              ))}
+            </Row>
+          </ListViewItem>
+        ))}
+      </ListView>
+    </Col>
+
+    <Divider />
+
+    <Row>
+      <Button
+        label="Prev"
+        iconStart="chevron-left"
+        disabled={pagination.hasPrev ? false : true}
+        onClickAction={{
+          type: "table.page.prev",
+          payload: { page: pagination.prevPage },
+        }}
+      />
+      <Spacer />
+      <Text
+        value={`${pagination.currentPage} / ${pagination.totalPages}`}
+        size="sm"
+        color="secondary"
+      />
+      <Spacer />
+      <Button
+        label="Next"
+        iconEnd="chevron-right"
+        disabled={pagination.hasNext ? false : true}
+        onClickAction={{
+          type: "table.page.next",
+          payload: { page: pagination.nextPage },
+        }}
+      />
+    </Row>
+  </Col>
+</Card>
