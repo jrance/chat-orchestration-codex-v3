@@ -1,0 +1,1149 @@
+{
+  "meta": {
+    "id": "sqlserver_data_dictionary_mapreduce_v1",
+    "name": "SQL Server Data Dictionary (Map-Reduce)",
+    "version": "1.0.0",
+    "createdAt": "2026-01-16T11:52:31Z",
+    "labels": {
+      "pattern": "map-reduce",
+      "domain": "data-dictionary",
+      "db": "sqlserver"
+    },
+    "extensions": {
+      "notes": [
+        "This IR stays within the v1.0 schema and uses node.data.additionalProperties for a few runtime hints.",
+        "Tool IDs are placeholders; wire them to your tool registry (db.* and render.*)."
+      ]
+    }
+  },
+  "entryId": "n_entry",
+  "schemas": {
+    "Form@1": {
+      "type": "object",
+      "properties": {
+        "schema_like": {
+          "type": "string",
+          "default": "%"
+        },
+        "include_views": {
+          "type": "boolean",
+          "default": true
+        },
+        "max_objects": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 200
+        },
+        "object_concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 6
+        },
+        "column_concurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 8
+        },
+        "sample_rows": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 25
+        },
+        "top_values": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 15
+        },
+        "join_verify_sample_keys": {
+          "type": "integer",
+          "minimum": 100,
+          "default": 5000
+        },
+        "emit_markdown": {
+          "type": "boolean",
+          "default": true
+        },
+        "emit_json": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "required": []
+    },
+    "DbObjectRef": {
+      "type": "object",
+      "required": [
+        "schema_name",
+        "object_name",
+        "object_type"
+      ],
+      "properties": {
+        "schema_name": {
+          "type": "string"
+        },
+        "object_name": {
+          "type": "string"
+        },
+        "object_type": {
+          "enum": [
+            "TABLE",
+            "VIEW"
+          ]
+        }
+      }
+    },
+    "DbObjectRefArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/schemas/DbObjectRef"
+      }
+    },
+    "ColumnProfile": {
+      "type": "object",
+      "required": [
+        "schema_name",
+        "object_name",
+        "column_name"
+      ],
+      "properties": {
+        "schema_name": {
+          "type": "string"
+        },
+        "object_name": {
+          "type": "string"
+        },
+        "column_name": {
+          "type": "string"
+        },
+        "row_count": {
+          "type": "integer"
+        },
+        "null_pct": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "approx_distinct": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "min_max": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "avg_len": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "sample_values": {
+          "type": "array",
+          "items": {}
+        },
+        "top_values": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "ColumnProfileArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/schemas/ColumnProfile"
+      }
+    },
+    "JoinCandidate": {
+      "type": "object",
+      "required": [
+        "left_schema",
+        "left_object",
+        "left_key",
+        "right_schema",
+        "right_object",
+        "right_key",
+        "status",
+        "rationale"
+      ],
+      "properties": {
+        "left_schema": {
+          "type": "string"
+        },
+        "left_object": {
+          "type": "string"
+        },
+        "left_key": {
+          "type": "string"
+        },
+        "right_schema": {
+          "type": "string"
+        },
+        "right_object": {
+          "type": "string"
+        },
+        "right_key": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "hypothesis",
+            "declared_fk"
+          ]
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "JoinCandidateArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/schemas/JoinCandidate"
+      }
+    },
+    "JoinVerification": {
+      "type": "object",
+      "required": [
+        "left_schema",
+        "left_object",
+        "left_key",
+        "right_schema",
+        "right_object",
+        "right_key",
+        "verification"
+      ],
+      "properties": {
+        "left_schema": {
+          "type": "string"
+        },
+        "left_object": {
+          "type": "string"
+        },
+        "left_key": {
+          "type": "string"
+        },
+        "right_schema": {
+          "type": "string"
+        },
+        "right_object": {
+          "type": "string"
+        },
+        "right_key": {
+          "type": "string"
+        },
+        "verification": {
+          "type": "object"
+        },
+        "source_object_key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "JoinVerificationArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/schemas/JoinVerification"
+      }
+    },
+    "ObjectDoc": {
+      "type": "object",
+      "required": [
+        "object_key",
+        "table_description",
+        "grain",
+        "columns"
+      ],
+      "properties": {
+        "object_key": {
+          "type": "string"
+        },
+        "table_description": {
+          "type": "string"
+        },
+        "grain": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "column_name",
+              "description",
+              "pii_risk"
+            ],
+            "properties": {
+              "column_name": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "pii_risk": {
+                "enum": [
+                  "low",
+                  "med",
+                  "high"
+                ]
+              },
+              "enum_mapping": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "notes": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "declared_relationships": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "inferred_join_candidates": {
+          "$ref": "#/schemas/JoinCandidateArray"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "ObjectDocArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/schemas/ObjectDoc"
+      }
+    },
+    "Issue": {
+      "type": "object",
+      "required": [
+        "severity",
+        "issue",
+        "evidence",
+        "recommendation"
+      ],
+      "properties": {
+        "severity": {
+          "enum": [
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "object_key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "column_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "issue": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "string"
+        },
+        "recommendation": {
+          "type": "string"
+        }
+      }
+    },
+    "IssueArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/schemas/Issue"
+      }
+    },
+    "DataDictionaryResult@1": {
+      "type": "object",
+      "required": [
+        "objects",
+        "join_verifications",
+        "issues"
+      ],
+      "properties": {
+        "markdown": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "json": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "objects": {
+          "$ref": "#/schemas/ObjectDocArray"
+        },
+        "join_verifications": {
+          "$ref": "#/schemas/JoinVerificationArray"
+        },
+        "issues": {
+          "$ref": "#/schemas/IssueArray"
+        }
+      }
+    }
+  },
+  "defaults": {
+    "toolTimeoutMs": 60000,
+    "maxParallelism": 8,
+    "historyPolicy": {
+      "window": {
+        "strategy": "token_budget",
+        "budgetTokens": 4096
+      },
+      "include": {
+        "roles": [
+          "system",
+          "user",
+          "assistant"
+        ],
+        "toolCalls": {
+          "previousTurns": false,
+          "currentTurn": true,
+          "mode": "summary"
+        },
+        "interAgent": {
+          "previousTurns": false,
+          "currentTurn": false,
+          "channels": [
+            "*"
+          ]
+        },
+        "attachments": "references"
+      },
+      "summarize": {
+        "enabled": true,
+        "targetTokens": 800
+      },
+      "redact": {
+        "pii": true,
+        "secrets": true
+      }
+    }
+  },
+  "nodes": [
+    {
+      "id": "n_entry",
+      "kind": "entry.chat_form",
+      "label": "Entry: Parameters",
+      "data": {
+        "formSchemaRef": "#/schemas/Form@1"
+      }
+    },
+    {
+      "id": "n_get_catalog",
+      "kind": "tool",
+      "label": "db.get_catalog_objects",
+      "data": {
+        "toolId": "db.get_catalog_objects",
+        "argsSchema": {
+          "type": "object",
+          "properties": {
+            "schema_like": {
+              "type": "string"
+            },
+            "include_views": {
+              "type": "boolean"
+            },
+            "max_objects": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "schema_like",
+            "include_views",
+            "max_objects"
+          ]
+        }
+      }
+    },
+    {
+      "id": "n_parallel_objects",
+      "kind": "parallel",
+      "label": "Map: Objects",
+      "data": {
+        "mode": "items",
+        "concurrency": 6,
+        "timeoutSec": 600,
+        "extensions": {
+          "iteration": {
+            "itemVar": "variables.current_object",
+            "indexVar": "variables.current_object_index"
+          }
+        }
+      }
+    },
+    {
+      "id": "n_get_meta",
+      "kind": "tool",
+      "label": "db.get_object_metadata",
+      "data": {
+        "toolId": "db.get_object_metadata"
+      }
+    },
+    {
+      "id": "n_profile_table",
+      "kind": "tool",
+      "label": "db.profile_table",
+      "data": {
+        "toolId": "db.profile_table"
+      }
+    },
+    {
+      "id": "n_parallel_columns",
+      "kind": "parallel",
+      "label": "Map: Columns",
+      "data": {
+        "mode": "items",
+        "concurrency": 8,
+        "timeoutSec": 900,
+        "extensions": {
+          "iteration": {
+            "itemVar": "variables.current_column",
+            "indexVar": "variables.current_column_index"
+          }
+        }
+      }
+    },
+    {
+      "id": "n_profile_column",
+      "kind": "tool",
+      "label": "db.profile_column",
+      "data": {
+        "toolId": "db.profile_column"
+      }
+    },
+    {
+      "id": "n_reduce_columns",
+      "kind": "reducer",
+      "label": "Reduce: Column Profiles",
+      "data": {
+        "fields": [
+          {
+            "target": "column_profiles",
+            "strategy": "list_concat"
+          }
+        ]
+      }
+    },
+    {
+      "id": "n_annotate_object",
+      "kind": "agent.codeless",
+      "label": "Annotate Object (LLM)",
+      "data": {
+        "systemInstructions": "You write a high-quality data dictionary entry for ONE DB object.\nUse provided metadata + table profile + column profiles as evidence.\nRules:\n- Label claims as Confirmed (from metadata/profiles) or Hypothesis (naming inference).\n- Provide concise table_description and grain.\n- For each column: description + pii_risk. If low-cardinality, propose enum_mapping from top_values.\n- Emit inferred_join_candidates only when you have evidence (naming + key-like stats).\n",
+        "model": {
+          "provider": "openai",
+          "modelId": "gpt-4o-mini",
+          "temperature": 0
+        },
+        "tools": {
+          "policy": "Disabled",
+          "attached": []
+        },
+        "structuredOutput": {
+          "enabled": true,
+          "schemaRef": "#/schemas/ObjectDoc"
+        }
+      }
+    },
+    {
+      "id": "n_extract_join_candidates",
+      "kind": "agent.codeless",
+      "label": "Extract Join Candidates",
+      "data": {
+        "systemInstructions": "From the ObjectDoc you produced, return ONLY JoinCandidateArray.\nInclude declared_fk items too if present in declared_relationships.\nIf none, return an empty array.",
+        "model": {
+          "provider": "openai",
+          "modelId": "gpt-4o-mini",
+          "temperature": 0
+        },
+        "tools": {
+          "policy": "Disabled",
+          "attached": []
+        },
+        "structuredOutput": {
+          "enabled": true,
+          "schemaRef": "#/schemas/JoinCandidateArray"
+        }
+      }
+    },
+    {
+      "id": "n_parallel_join_verify",
+      "kind": "parallel",
+      "label": "Map: Verify Joins",
+      "data": {
+        "mode": "items",
+        "concurrency": 6,
+        "timeoutSec": 900
+      }
+    },
+    {
+      "id": "n_verify_join",
+      "kind": "tool",
+      "label": "db.verify_join",
+      "data": {
+        "toolId": "db.verify_join"
+      }
+    },
+    {
+      "id": "n_reduce_joins",
+      "kind": "reducer",
+      "label": "Reduce: Join Verifications",
+      "data": {
+        "fields": [
+          {
+            "target": "join_verifications",
+            "strategy": "list_concat"
+          }
+        ]
+      }
+    },
+    {
+      "id": "n_reduce_objects",
+      "kind": "reducer",
+      "label": "Reduce: Object Docs",
+      "data": {
+        "fields": [
+          {
+            "target": "objects",
+            "strategy": "list_concat"
+          },
+          {
+            "target": "join_verifications",
+            "strategy": "list_concat"
+          },
+          {
+            "target": "issues",
+            "strategy": "list_concat"
+          }
+        ]
+      }
+    },
+    {
+      "id": "n_qa",
+      "kind": "agent.codeless",
+      "label": "QA & Consistency Pass",
+      "data": {
+        "systemInstructions": "You are a QA agent for a generated data dictionary.\nInput includes objects, join_verifications.\nFind inconsistencies (enum claims vs distinct counts, low join match_rate, suspicious PII tags, etc.)\nReturn IssueArray.",
+        "model": {
+          "provider": "openai",
+          "modelId": "gpt-4o-mini",
+          "temperature": 0
+        },
+        "tools": {
+          "policy": "Disabled",
+          "attached": []
+        },
+        "structuredOutput": {
+          "enabled": true,
+          "schemaRef": "#/schemas/IssueArray"
+        }
+      }
+    },
+    {
+      "id": "n_render",
+      "kind": "agent.codeless",
+      "label": "Render Outputs",
+      "data": {
+        "systemInstructions": "Render the final DataDictionaryResult@1.\nIf emit_markdown is true, create markdown (tables per object).\nIf emit_json is true, include a json object that mirrors the data.\nAlways include objects, join_verifications, issues.\n",
+        "model": {
+          "provider": "openai",
+          "modelId": "gpt-4o-mini",
+          "temperature": 0
+        },
+        "tools": {
+          "policy": "Disabled",
+          "attached": []
+        },
+        "structuredOutput": {
+          "enabled": true,
+          "schemaRef": "#/schemas/DataDictionaryResult@1"
+        }
+      }
+    },
+    {
+      "id": "n_out",
+      "kind": "output",
+      "label": "Output",
+      "data": {
+        "schemaRef": "#/schemas/DataDictionaryResult@1"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "n_entry",
+      "to": "n_get_catalog",
+      "mapping": [
+        {
+          "from": "$.form.values.schema_like",
+          "to": "schema_like",
+          "default": "%"
+        },
+        {
+          "from": "$.form.values.include_views",
+          "to": "include_views",
+          "default": true
+        },
+        {
+          "from": "$.form.values.max_objects",
+          "to": "max_objects",
+          "default": 200
+        }
+      ]
+    },
+    {
+      "id": "e2",
+      "from": "n_entry",
+      "to": "n_parallel_objects",
+      "mapping": [
+        {
+          "from": "$.form.values.object_concurrency",
+          "to": "concurrency",
+          "transform": [
+            "to_number",
+            {
+              "clamp": [
+                1,
+                64
+              ]
+            }
+          ],
+          "default": 6
+        }
+      ]
+    },
+    {
+      "id": "e3",
+      "from": "n_get_catalog",
+      "to": "n_parallel_objects",
+      "mapping": [
+        {
+          "from": "$",
+          "to": "items"
+        },
+        {
+          "from": "$.messages",
+          "to": "messages",
+          "default": []
+        }
+      ]
+    },
+    {
+      "id": "e4",
+      "from": "n_parallel_objects",
+      "to": "n_get_meta",
+      "mapping": [
+        {
+          "from": "$.schema_name",
+          "to": "schema_name"
+        },
+        {
+          "from": "$.object_name",
+          "to": "object_name"
+        }
+      ]
+    },
+    {
+      "id": "e5",
+      "from": "n_get_meta",
+      "to": "n_profile_table",
+      "mapping": [
+        {
+          "from": "$.schema_name",
+          "to": "schema_name"
+        },
+        {
+          "from": "$.object_name",
+          "to": "object_name"
+        },
+        {
+          "from": "$.variables.form.sample_rows",
+          "to": "sample_rows",
+          "default": 25
+        }
+      ]
+    },
+    {
+      "id": "e6",
+      "from": "n_entry",
+      "to": "n_entry",
+      "mapping": [
+        {
+          "from": "$.form.values.sample_rows",
+          "to": "variables.form.sample_rows",
+          "default": 25
+        },
+        {
+          "from": "$.form.values.top_values",
+          "to": "variables.form.top_values",
+          "default": 15
+        },
+        {
+          "from": "$.form.values.join_verify_sample_keys",
+          "to": "variables.form.join_verify_sample_keys",
+          "default": 5000
+        },
+        {
+          "from": "$.form.values.emit_markdown",
+          "to": "variables.form.emit_markdown",
+          "default": true
+        },
+        {
+          "from": "$.form.values.emit_json",
+          "to": "variables.form.emit_json",
+          "default": true
+        }
+      ]
+    },
+    {
+      "id": "e7",
+      "from": "n_get_meta",
+      "to": "n_parallel_columns",
+      "mapping": [
+        {
+          "from": "$.columns",
+          "to": "items"
+        }
+      ]
+    },
+    {
+      "id": "e8",
+      "from": "n_entry",
+      "to": "n_parallel_columns",
+      "mapping": [
+        {
+          "from": "$.form.values.column_concurrency",
+          "to": "concurrency",
+          "transform": [
+            "to_number",
+            {
+              "clamp": [
+                1,
+                128
+              ]
+            }
+          ],
+          "default": 8
+        }
+      ]
+    },
+    {
+      "id": "e9",
+      "from": "n_parallel_columns",
+      "to": "n_profile_column",
+      "mapping": [
+        {
+          "from": "$.variables.current_object.schema_name",
+          "to": "schema_name"
+        },
+        {
+          "from": "$.variables.current_object.object_name",
+          "to": "object_name"
+        },
+        {
+          "from": "$.name",
+          "to": "column_name"
+        },
+        {
+          "from": "$.variables.form.top_values",
+          "to": "top_n",
+          "default": 15
+        }
+      ]
+    },
+    {
+      "id": "e10",
+      "from": "n_profile_column",
+      "to": "n_reduce_columns",
+      "mapping": [
+        {
+          "from": "$",
+          "to": "column_profiles",
+          "transform": "wrap_array",
+          "reduce": "list_concat"
+        }
+      ]
+    },
+    {
+      "id": "e11",
+      "from": "n_reduce_columns",
+      "to": "n_annotate_object",
+      "mapping": [
+        {
+          "from": "$.variables.current_object.schema_name",
+          "to": "schema_name"
+        },
+        {
+          "from": "$.variables.current_object.object_name",
+          "to": "object_name"
+        },
+        {
+          "from": "$.variables.current_object.object_type",
+          "to": "object_type"
+        },
+        {
+          "from": "$.column_profiles",
+          "to": "column_profiles"
+        },
+        {
+          "from": "$.variables._last_meta",
+          "to": "object_metadata",
+          "default": null
+        },
+        {
+          "from": "$.variables._last_table_profile",
+          "to": "table_profile",
+          "default": null
+        }
+      ]
+    },
+    {
+      "id": "e12",
+      "from": "n_get_meta",
+      "to": "n_get_meta",
+      "mapping": [
+        {
+          "from": "$",
+          "to": "variables._last_meta"
+        }
+      ]
+    },
+    {
+      "id": "e13",
+      "from": "n_profile_table",
+      "to": "n_profile_table",
+      "mapping": [
+        {
+          "from": "$",
+          "to": "variables._last_table_profile"
+        }
+      ]
+    },
+    {
+      "id": "e14",
+      "from": "n_annotate_object",
+      "to": "n_extract_join_candidates",
+      "mapping": [
+        {
+          "from": "$",
+          "to": "$"
+        }
+      ]
+    },
+    {
+      "id": "e15",
+      "from": "n_extract_join_candidates",
+      "to": "n_parallel_join_verify",
+      "mapping": [
+        {
+          "from": "$",
+          "to": "items"
+        }
+      ]
+    },
+    {
+      "id": "e16",
+      "from": "n_parallel_join_verify",
+      "to": "n_verify_join",
+      "mapping": [
+        {
+          "from": "$.left_schema",
+          "to": "left_schema"
+        },
+        {
+          "from": "$.left_object",
+          "to": "left_object"
+        },
+        {
+          "from": "$.left_key",
+          "to": "left_key"
+        },
+        {
+          "from": "$.right_schema",
+          "to": "right_schema"
+        },
+        {
+          "from": "$.right_object",
+          "to": "right_object"
+        },
+        {
+          "from": "$.right_key",
+          "to": "right_key"
+        },
+        {
+          "from": "$.variables.form.join_verify_sample_keys",
+          "to": "sample_keys",
+          "default": 5000
+        }
+      ]
+    },
+    {
+      "id": "e17",
+      "from": "n_verify_join",
+      "to": "n_reduce_joins",
+      "mapping": [
+        {
+          "from": "$.variables.current_object.schema_name",
+          "to": "join_verifications[0].source_object_key",
+          "default": null
+        },
+        {
+          "from": "$.variables.current_object.schema_name",
+          "to": "join_verifications[0].left_schema",
+          "default": ""
+        },
+        {
+          "from": "$.variables.current_object.object_name",
+          "to": "join_verifications[0].left_object",
+          "default": ""
+        },
+        {
+          "from": "$.variables.current_column.name",
+          "to": "join_verifications[0].left_key",
+          "default": ""
+        },
+        {
+          "from": "$.verification",
+          "to": "join_verifications[0].verification",
+          "default": {}
+        },
+        {
+          "from": "$.join_verifications",
+          "to": "join_verifications",
+          "default": []
+        }
+      ]
+    },
+    {
+      "id": "e18",
+      "from": "n_annotate_object",
+      "to": "n_reduce_objects",
+      "mapping": [
+        {
+          "from": "$",
+          "to": "objects",
+          "transform": "wrap_array",
+          "reduce": "list_concat"
+        }
+      ]
+    },
+    {
+      "id": "e19",
+      "from": "n_reduce_joins",
+      "to": "n_reduce_objects",
+      "mapping": [
+        {
+          "from": "$.join_verifications",
+          "to": "join_verifications",
+          "reduce": "list_concat",
+          "default": []
+        }
+      ]
+    },
+    {
+      "id": "e20",
+      "from": "n_reduce_objects",
+      "to": "n_qa",
+      "mapping": [
+        {
+          "from": "$.objects",
+          "to": "objects"
+        },
+        {
+          "from": "$.join_verifications",
+          "to": "join_verifications"
+        }
+      ]
+    },
+    {
+      "id": "e21",
+      "from": "n_qa",
+      "to": "n_reduce_objects",
+      "mapping": [
+        {
+          "from": "$",
+          "to": "issues",
+          "reduce": "list_concat",
+          "default": []
+        }
+      ]
+    },
+    {
+      "id": "e22",
+      "from": "n_reduce_objects",
+      "to": "n_render",
+      "mapping": [
+        {
+          "from": "$.objects",
+          "to": "objects"
+        },
+        {
+          "from": "$.join_verifications",
+          "to": "join_verifications"
+        },
+        {
+          "from": "$.issues",
+          "to": "issues"
+        },
+        {
+          "from": "$.variables.form.emit_markdown",
+          "to": "emit_markdown",
+          "default": true
+        },
+        {
+          "from": "$.variables.form.emit_json",
+          "to": "emit_json",
+          "default": true
+        }
+      ]
+    },
+    {
+      "id": "e23",
+      "from": "n_render",
+      "to": "n_out",
+      "mapping": [
+        {
+          "from": "$",
+          "to": "$"
+        }
+      ]
+    }
+  ]
+}
