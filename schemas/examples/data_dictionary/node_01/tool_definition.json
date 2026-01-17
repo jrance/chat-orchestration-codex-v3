@@ -1,0 +1,46 @@
+{
+  id: "tool:sql_get_catalog_objects",
+  name: "SQL Get Catalog Objects",
+  version: "1.0.0",
+  category: "sqlserver",
+  auth: { type: "ConnectionString" },
+  transport: { kind: "python", entrypoint: "sql_get_catalog_objects" },
+  parameters: [
+    {
+      name: "connection_string",
+      type: "string",
+      scope: "AgentOverride",
+      description: "SQL Server connection string used by the tool at runtime (injected from the orchestration input form)."
+    },
+    {
+      name: "include_schemas",
+      type: "string[]",
+      default: [],
+      scope: "AgentOverride",
+      description: "If non-empty, only include objects whose schema is in this allow-list. Applied before exclude_schemas."
+    },
+    {
+      name: "exclude_schemas",
+      type: "string[]",
+      default: [],
+      scope: "AgentOverride",
+      description: "Exclude objects whose schema is in this deny-list. Applied after include_schemas."
+    },
+    {
+      name: "include_object_types",
+      type: "string[]",
+      default: ["table", "view"],
+      scope: "AgentOverride",
+      description: "Object types to include. Allowed values: 'table', 'view'. Defaults to both."
+    },
+    {
+      name: "include_system_schemas",
+      type: "boolean",
+      default: false,
+      scope: "AgentOverride",
+      description: "If true, include system schemas/objects (e.g., sys, INFORMATION_SCHEMA, ms_shipped). Defaults to false."
+    }
+  ],
+  status: "active",
+  description: "List SQL Server catalog objects (tables/views) with optional schema/type filters."
+}
