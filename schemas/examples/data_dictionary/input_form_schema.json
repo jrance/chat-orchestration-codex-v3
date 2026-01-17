@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/schemas/data-dictionary-input-form.schema.json",
+  "title": "Data Dictionary Generator - Input Form",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "include_schemas",
+    "exclude_schemas",
+    "include_object_types",
+    "concurrency_objects",
+    "concurrency_columns",
+    "max_columns_profiled_per_object",
+    "sample_rows_per_object",
+    "top_values_per_column",
+    "strict_no_sample_values",
+    "domain_glossary"
+  ],
+  "properties": {
+    "include_schemas": {
+      "type": "array",
+      "title": "Include Schemas",
+      "description": "If non-empty, only objects in these schemas will be included.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    },
+    "exclude_schemas": {
+      "type": "array",
+      "title": "Exclude Schemas",
+      "description": "Schemas to exclude (applied after include_schemas filter).",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": []
+    },
+    "include_object_types": {
+      "type": "array",
+      "title": "Include Object Types",
+      "description": "Which catalog object types to include in the dictionary.",
+      "items": {
+        "type": "string",
+        "enum": ["table", "view"]
+      },
+      "minItems": 1,
+      "uniqueItems": true,
+      "default": ["table", "view"]
+    },
+    "concurrency_objects": {
+      "type": "integer",
+      "title": "Object Fan-out Concurrency",
+      "description": "Maximum number of tables/views to process in parallel.",
+      "minimum": 1,
+      "default": 8
+    },
+    "concurrency_columns": {
+      "type": "integer",
+      "title": "Column Fan-out Concurrency",
+      "description": "Maximum number of columns to profile in parallel per object (if column profiling fan-out is enabled).",
+      "minimum": 1,
+      "default": 16
+    },
+    "max_columns_profiled_per_object": {
+      "type": "integer",
+      "title": "Max Columns Profiled Per Object",
+      "description": "If an object has more columns than this limit, only a heuristic subset is profiled; otherwise all columns are profiled.",
+      "minimum": 1,
+      "default": 80
+    },
+    "sample_rows_per_object": {
+      "type": "integer",
+      "title": "Sample Rows Per Object",
+      "description": "Number of sample rows to retrieve/profile per table/view (unless strict_no_sample_values is true).",
+      "minimum": 0,
+      "default": 10
+    },
+    "top_values_per_column": {
+      "type": "integer",
+      "title": "Top Values Per Column",
+      "description": "Number of top/frequent values to compute per column during profiling.",
+      "minimum": 0,
+      "default": 10
+    },
+    "strict_no_sample_values": {
+      "type": "boolean",
+      "title": "Strict No Sample Values",
+      "description": "If true, do not retrieve or pass through raw sample values; only include aggregate statistics.",
+      "default": false
+    },
+    "domain_glossary": {
+      "type": "string",
+      "title": "Domain Glossary",
+      "description": "Free-text glossary and notes (acronyms, domain terms, known entities) to improve descriptions.",
+      "default": ""
+    }
+  },
+  "allOf": [
+    {
+      "description": "Include/exclude schema lists should not overlap.",
+      "not": {
+        "type": "object",
+        "properties": {
+          "include_schemas": {
+            "type": "array",
+            "minItems": 1
+          },
+          "exclude_schemas": {
+            "type": "array",
+            "minItems": 1
+          }
+        },
+        "required": ["include_schemas", "exclude_schemas"]
+      }
+    }
+  ]
+}
