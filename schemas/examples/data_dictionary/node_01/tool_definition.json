@@ -1,44 +1,36 @@
 {
   id: "tool:sql_get_catalog_objects",
-  name: "SQL Get Catalog Objects",
+  name: "Get Catalog Objects",
   version: "1.0.0",
-  category: "sqlserver",
+  category: "SQL Server",
   auth: { type: "ConnectionString" },
-  transport: { kind: "python", entrypoint: "sql_get_catalog_objects" },
   parameters: [
     {
       name: "connection_string",
       type: "string",
       scope: "AgentOverride",
-      description: "SQL Server connection string used by the tool at runtime (injected from the orchestration input form)."
+      description: "SQL Server connection string to the database."
     },
     {
       name: "include_schemas",
-      type: "string[]",
-      default: [],
+      type: "string",
+      default: "",
       scope: "AgentOverride",
-      description: "If non-empty, only include objects whose schema is in this allow-list. Applied before exclude_schemas."
+      description: "If non-empty, only include objects whose schema is in this comma-separated list."
     },
     {
-      name: "exclude_schemas",
-      type: "string[]",
-      default: [],
-      scope: "AgentOverride",
-      description: "Exclude objects whose schema is in this deny-list. Applied after include_schemas."
-    },
-    {
-      name: "include_object_types",
-      type: "string[]",
-      default: ["table", "view"],
-      scope: "AgentOverride",
-      description: "Object types to include. Allowed values: 'table', 'view'. Defaults to both."
-    },
-    {
-      name: "include_system_schemas",
+      name: "include_tables",
       type: "boolean",
-      default: false,
+      default: true,
       scope: "AgentOverride",
-      description: "If true, include system schemas/objects (e.g., sys, INFORMATION_SCHEMA, ms_shipped). Defaults to false."
+      description: "Include tables in the retrieved objects."
+    },
+    {
+      name: "include_views",
+      type: "boolean",
+      default: true,
+      scope: "AgentOverride",
+      description: "Include views in the retrieved objects."
     }
   ],
   status: "active",
