@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional
 
 import pyodbc
 from langchain_core.tools import tool
 
+
+# -----------------------------
+# Helpers
+# -----------------------------
 
 def _quote_ident(ident: str) -> str:
     if not ident or not isinstance(ident, str):
@@ -43,20 +47,49 @@ def _normalize_table_type(t: str) -> Literal["table", "view"]:
     raise ValueError("table_type must be 'table' or 'view'")
 
 
-def _infer_is_numeric(data_type: str) -> bool:
+def _is_numeric_type(data_type: str) -> bool:
     t = (data_type or "").lower()
-    return any(x in t for x in ["int", "decimal", "numeric", "money", "float", "real", "bigint", "smallint", "tinyint"])
+    return any(x in t for x in ("int", "decimal", "numeric", "money", "float", "real", "bigint", "smallint", "tinyint"))
 
 
-def _infer_is_datetime(data_type: str) -> bool:
+def _is_datetime_type(data_type: str) -> bool:
     t = (data_type or "").lower()
-    return any(x in t for x in ["date", "time", "datetime", "smalldatetime", "datetime2", "datetimeoffset"])
+    return any(x in t for x in ("date", "time", "datetime", "smalldatetime", "datetime2", "datetimeoffset"))
 
 
-def _infer_is_text(data_type: str) -> bool:
+def _is_text_type(data_type: str) -> bool:
     t = (data_type or "").lower()
-    return any(x in t for x in ["char", "varchar", "nchar", "nvarchar", "text", "ntext"])
+    return any(x in t for x in ("char", "varchar", "nchar", "nvarchar", "text", "ntext"))
 
+
+def _needs_cast_for_pyodbc(data_type: str) -> bool:
+    """
+    Types that often cause pyodbc decode errors (e.g., datetimeoffset => ODBC -155) or
+    otherwise are better treated as strings for profiling outputs.
+    """
+    t = (data_type or "").lower()
+    return t in ("datetimeoffset", "sql_variant", "xml", "hierarchyid", "geography", "geometry", "image", "varbinary", "binary", "text", "ntext")
+
+
+def _cast_expr(qcol: str, data_type: str) -> str:
+    """
+    Return SQL expression that safely converts the column to NVARCHAR for retrieval.
+    """
+    t = (data_type or "").lower()
+    if t == "datetimeoffset":
+        # ISO 8601-ish (style 127)
+        return f"CONVERT(nvarchar(50), {qcol}, 127)"
+    if t in ("hierarchyid", "geography", "geometry", "sql_variant", "xml", "text", "ntext"):
+        return f"CONVERT(nvarchar(4000), {qcol})"
+    if t in ("image", "varbinary", "binary"):
+        return f"CONVERT(nvarchar(4000), sys.fn_varbintohexstr({qcol}))"
+    # fallback
+    return f"CONVERT(nvarchar(4000), {qcol})"
+
+
+# -----------------------------
+# Tool
+# -----------------------------
 
 @tool("sql_profile_column")
 def sql_profile_column(
@@ -74,30 +107,13 @@ def sql_profile_column(
     Profile a single column:
       - row_count (best-effort)
       - null_count / null_pct
-      - distinct_count (exact for <= ~2M rows; otherwise approximate via COUNT_BIG(DISTINCT))
-      - min/max for numeric/datetime
-      - max_length for text
-      - top values (optional)
-      - sample distinct values (optional)
+      - distinct_count
+      - min/max for numeric/datetime (when safe)
+      - max_length for text (when safe)
+      - top values + sample distinct values (optional)
 
-    Returns:
-      {
-        "schema": "...",
-        "table_name": "...",
-        "table_type": "table"|"view",
-        "column_name": "...",
-        "data_type": "...",
-        "row_count": int|null,
-        "null_count": int|null,
-        "null_pct": float|null,
-        "distinct_count": int|null,
-        "min": any|null,
-        "max": any|null,
-        "max_length": int|null,
-        "top_values": [{"value":..., "count":..., "pct":...}, ...],
-        "sample_values": [...],
-        "notes": {...}
-      }
+    Includes fix for ODBC Driver 17 + pyodbc HY106 on datetimeoffset (-155):
+      - casts problematic types to NVARCHAR in queries that return the value.
     """
     if not connection_string or not isinstance(connection_string, str):
         raise ValueError("connection_string must be a non-empty string")
@@ -118,7 +134,7 @@ def sql_profile_column(
         raise ValueError("top_values and sample_values must be >= 0")
 
     full_table = f"{_quote_ident(schema)}.{_quote_ident(table_name)}"
-    col_ident = _quote_ident(column_name)
+    qcol = _quote_ident(column_name)
 
     notes: Dict[str, Any] = {}
     row_count: Optional[int] = None
@@ -134,7 +150,7 @@ def sql_profile_column(
         conn.timeout = 120
         cur = conn.cursor()
 
-        # 1) Get data type from sys.columns/sys.types (works for tables/views)
+        # 1) Get column SQL type from sys catalog
         cur.execute(
             """
             SELECT TOP 1 t.name AS data_type
@@ -151,7 +167,16 @@ def sql_profile_column(
             raise ValueError(f"Column not found: {schema}.{table_name}.{column_name}")
         data_type = str(dt_row[0])
 
-        # 2) Row count (fast for tables; potentially expensive for views)
+        # Determine whether to cast value-returning queries
+        needs_cast = _needs_cast_for_pyodbc(data_type)
+        value_expr = _cast_expr(qcol, data_type) if needs_cast else qcol
+        if needs_cast:
+            notes["value_cast"] = f"{data_type} -> nvarchar"
+            # When we cast, min/max on original type may still be OK for numeric/datetimeoffset? datetimeoffset is problematic
+            # We'll keep min/max only if truly safe.
+        safe_for_minmax = _is_numeric_type(data_type) or (_is_datetime_type(data_type) and data_type.lower() != "datetimeoffset")
+
+        # 2) Row count
         if tt == "table":
             cur.execute(
                 """
@@ -171,56 +196,51 @@ def sql_profile_column(
             rc = cur.fetchone()
             row_count = int(rc[0]) if rc and rc[0] is not None else None
 
-        # 3) Null count, distinct count, min/max/max_length
-        # Build a single aggregation query with safe quoted identifiers.
+        # 3) Aggregates (null_count, distinct_count, min/max/max_len)
         agg_parts: List[str] = [
-            f"SUM(CASE WHEN {col_ident} IS NULL THEN 1 ELSE 0 END) AS null_count",
-            f"COUNT_BIG(DISTINCT {col_ident}) AS distinct_count",
+            f"SUM(CASE WHEN {qcol} IS NULL THEN 1 ELSE 0 END) AS null_count",
+            f"COUNT_BIG(DISTINCT {qcol}) AS distinct_count",
         ]
 
-        if _infer_is_numeric(data_type) or _infer_is_datetime(data_type):
-            agg_parts.append(f"MIN({col_ident}) AS min_val")
-            agg_parts.append(f"MAX({col_ident}) AS max_val")
-        elif _infer_is_text(data_type):
-            # For text-like columns, max_length helps choose description phrasing
-            agg_parts.append(f"MAX(LEN({col_ident})) AS max_len")
+        if safe_for_minmax:
+            agg_parts.append(f"MIN({qcol}) AS min_val")
+            agg_parts.append(f"MAX({qcol}) AS max_val")
+        elif _is_text_type(data_type) and not needs_cast:
+            # If it's text-ish but not requiring cast, max length is meaningful
+            agg_parts.append(f"MAX(LEN({qcol})) AS max_len")
 
         agg_sql = f"SELECT {', '.join(agg_parts)} FROM {full_table};"
         cur.execute(agg_sql)
         agg = cur.fetchone()
 
-        # Map aggregation outputs by position
         null_count = int(agg[0]) if agg and agg[0] is not None else None
         distinct_count = int(agg[1]) if agg and agg[1] is not None else None
 
-        # min/max or max_len depending on type
-        if agg and len(agg) >= 4 and (_infer_is_numeric(data_type) or _infer_is_datetime(data_type)):
+        if safe_for_minmax and agg and len(agg) >= 4:
             min_val = _json_safe(agg[2], max_len=max_value_length)
             max_val = _json_safe(agg[3], max_len=max_value_length)
-        elif agg and len(agg) >= 3 and _infer_is_text(data_type):
+        elif _is_text_type(data_type) and not needs_cast and agg and len(agg) >= 3:
             max_len = int(agg[2]) if agg[2] is not None else None
 
         null_pct: Optional[float] = None
         if row_count and null_count is not None and row_count > 0:
             null_pct = float(null_count) / float(row_count)
 
-        # 4) Top values (optional, omit if strict_no_sample_values)
+        # 4) Top values (value-returning query => use value_expr when needed)
         if not strict_no_sample_values and top_values > 0:
-            # Note: For large tables/views this can be expensive.
-            # You can add sampling or WHERE filters later if needed.
             top_n = min(top_values, 200)
+            # Grouping: if we cast, group by the casted expression to avoid unsupported fetch on raw type.
             top_sql = f"""
             SELECT TOP ({top_n})
-                {col_ident} AS value,
+                {value_expr} AS value,
                 COUNT_BIG(1) AS cnt
             FROM {full_table}
-            WHERE {col_ident} IS NOT NULL
-            GROUP BY {col_ident}
+            WHERE {qcol} IS NOT NULL
+            GROUP BY {value_expr}
             ORDER BY COUNT_BIG(1) DESC;
             """
             cur.execute(top_sql)
-            rows = cur.fetchall()
-            for v, cnt in rows:
+            for v, cnt in cur.fetchall():
                 pct = (float(cnt) / float(row_count)) if row_count and row_count > 0 else None
                 top_vals_out.append(
                     {
@@ -230,16 +250,15 @@ def sql_profile_column(
                     }
                 )
 
-        # 5) Sample distinct values (optional, omit if strict_no_sample_values)
+        # 5) Sample distinct values (value-returning query => use value_expr when needed)
         if not strict_no_sample_values and sample_values > 0:
             n = min(sample_values, 200)
-            # Prefer distinct sample; for some types it may still be heavy.
             sample_sql = f"""
             SELECT TOP ({n}) v.value
             FROM (
-              SELECT DISTINCT {col_ident} AS value
+              SELECT DISTINCT {value_expr} AS value
               FROM {full_table}
-              WHERE {col_ident} IS NOT NULL
+              WHERE {qcol} IS NOT NULL
             ) v
             ORDER BY v.value;
             """
