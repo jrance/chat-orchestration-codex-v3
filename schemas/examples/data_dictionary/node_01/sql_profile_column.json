@@ -1,0 +1,76 @@
+{
+  id: "tool:sql_profile_column",
+  name: "Profile Column",
+  version: "1.0.0",
+  category: "SQL Server",
+  auth: { type: "ConnectionString" },
+  parameters: [
+    {
+      name: "connection_string",
+      type: "string",
+      scope: "AgentOverride",
+      description: "SQL Server connection string to the database."
+    },
+    {
+      name: "schema",
+      type: "string",
+      scope: "AgentOverride",
+      description: "Schema name of the table/view (e.g., 'dbo')."
+    },
+    {
+      name: "table_name",
+      type: "string",
+      scope: "AgentOverride",
+      description: "Name of the table/view that contains the column (e.g., 'Orders' or 'vw_OrderSummary')."
+    },
+    {
+      name: "table_type",
+      type: "string",
+      default: "table",
+      scope: "AgentOverride",
+      description: "Object type of table_name: 'table' or 'view'."
+    },
+    {
+      name: "column_name",
+      type: "string",
+      scope: "AgentOverride",
+      description: "Name of the column to profile."
+    },
+    {
+      name: "top_values",
+      type: "number",
+      default: 10,
+      min: 0,
+      max: 200,
+      scope: "AgentOverride",
+      description: "Number of top/frequent values to return for the column."
+    },
+    {
+      name: "sample_values",
+      type: "number",
+      default: 10,
+      min: 0,
+      max: 200,
+      scope: "AgentOverride",
+      description: "Number of sample (distinct) values to return for the column (omitted if strict_no_sample_values is true)."
+    },
+    {
+      name: "strict_no_sample_values",
+      type: "boolean",
+      default: false,
+      scope: "AgentOverride",
+      description: "If true, do not return raw sample values; return stats only."
+    },
+    {
+      name: "max_value_length",
+      type: "number",
+      default: 200,
+      min: 20,
+      max: 4000,
+      scope: "AgentOverride",
+      description: "Maximum length of any returned string value in top_values/sample_values (long strings are truncated)."
+    }
+  ],
+  status: "active",
+  description: "Profiles a single column: null counts, distinct estimates, min/max (when applicable), and top/sample values (optional)."
+}

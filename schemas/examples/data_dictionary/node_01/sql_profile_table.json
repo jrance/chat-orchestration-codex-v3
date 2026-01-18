@@ -1,0 +1,59 @@
+{
+  id: "tool:sql_profile_table",
+  name: "Profile Table/View",
+  version: "1.0.0",
+  category: "SQL Server",
+  auth: { type: "ConnectionString" },
+  parameters: [
+    {
+      name: "connection_string",
+      type: "string",
+      scope: "AgentOverride",
+      description: "SQL Server connection string to the database."
+    },
+    {
+      name: "schema",
+      type: "string",
+      scope: "AgentOverride",
+      description: "Schema name of the table/view (e.g., 'dbo')."
+    },
+    {
+      name: "name",
+      type: "string",
+      scope: "AgentOverride",
+      description: "Object name of the table/view (e.g., 'Orders')."
+    },
+    {
+      name: "type",
+      type: "string",
+      default: "table",
+      scope: "AgentOverride",
+      description: "Object type: 'table' or 'view'."
+    },
+    {
+      name: "sample_rows",
+      type: "number",
+      default: 10,
+      min: 0,
+      max: 1000,
+      scope: "AgentOverride",
+      description: "Number of sample rows to retrieve (TOP N). Ignored if strict_no_sample_values is true."
+    },
+    {
+      name: "strict_no_sample_values",
+      type: "boolean",
+      default: false,
+      scope: "AgentOverride",
+      description: "If true, do not return raw sample row values; only return non-sensitive summary metadata (e.g., row_count when available)."
+    },
+    {
+      name: "compute_row_count",
+      type: "boolean",
+      default: true,
+      scope: "AgentOverride",
+      description: "If true, compute row_count. For tables this uses sys.partitions (fast). For views this may run COUNT_BIG(*) (can be expensive)."
+    }
+  ],
+  status: "active",
+  description: "Return lightweight profiling for a table/view: row count (when requested) and optional TOP-N sample rows."
+}

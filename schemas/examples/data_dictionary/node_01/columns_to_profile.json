@@ -1,0 +1,47 @@
+{
+  id: "tool:columns_to_profile",
+  name: "Select Columns To Profile",
+  version: "1.0.0",
+  category: "SQL Server",
+  auth: { type: "None" },
+  parameters: [
+    {
+      name: "object_metadata",
+      type: "json",
+      scope: "AgentOverride",
+      description: "Object metadata returned by sql_get_object_metadata (must include columns[], and optionally primary_key/foreign_keys)."
+    },
+    {
+      name: "max_columns_profiled_per_object",
+      type: "number",
+      default: 80,
+      min: 1,
+      max: 2000,
+      scope: "AgentOverride",
+      description: "If total column count <= this value, all columns are selected; otherwise a heuristic subset is selected."
+    },
+    {
+      name: "include_columns",
+      type: "string",
+      default: "",
+      scope: "AgentOverride",
+      description: "Optional comma-separated column allow-list that will always be included (if present on the object)."
+    },
+    {
+      name: "exclude_columns",
+      type: "string",
+      default: "",
+      scope: "AgentOverride",
+      description: "Optional comma-separated column deny-list that will be excluded even if heuristics would select them."
+    },
+    {
+      name: "return_full_metadata",
+      type: "boolean",
+      default: false,
+      scope: "AgentOverride",
+      description: "If true, return selected column objects (name/type/nullability/etc). If false, return only column names."
+    }
+  ],
+  status: "active",
+  description: "Deterministically selects which columns to run sql_profile_column on, using PK/FK + name/type heuristics with a configurable cap."
+}
