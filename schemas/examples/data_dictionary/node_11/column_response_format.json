@@ -1,0 +1,77 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "object_key": {
+      "type": "string",
+      "description": "Stable identifier like 'schema.name' (optionally include type)."
+    },
+    "columns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "column_name": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 },
+          "semantic_type": {
+            "type": "string",
+            "enum": [
+              "identifier",
+              "foreign_key",
+              "name",
+              "description_text",
+              "status",
+              "category",
+              "code",
+              "flag_boolean",
+              "date",
+              "datetime",
+              "time",
+              "amount",
+              "quantity",
+              "percentage",
+              "currency",
+              "address",
+              "location",
+              "contact",
+              "email",
+              "phone",
+              "person",
+              "organization",
+              "url",
+              "json",
+              "free_text",
+              "unknown"
+            ]
+          },
+          "is_identifier": { "type": "boolean" },
+          "is_sensitive": { "type": "boolean" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "open_questions": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "default": []
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "required": [
+          "column_name",
+          "description",
+          "semantic_type",
+          "is_identifier",
+          "is_sensitive",
+          "confidence",
+          "open_questions",
+          "evidence"
+        ]
+      }
+    }
+  },
+  "required": ["object_key", "columns"]
+}
