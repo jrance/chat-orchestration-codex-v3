@@ -1,0 +1,19 @@
+{
+  "errorPolicies": [
+    { "...": "global_default" },
+    { "...": "tool-default-retry" }
+  ],
+  "graphSettings": {
+    "defaultErrorPolicyId": "global_default",
+    "maxGraphRecursion": 100,
+    "parallelErrorMode": "best_effort"
+  },
+  "nodes": [
+    {
+      "id": "tool_node_7",
+      "type": "tool",
+      "name": "Call CRM API",
+      "errorPolicyId": "tool-default-retry"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "id": "tool-default-retry",
+  "enabled": true,
+
+  "classification": {
+    "retryOnCategories": ["transient", "rate_limit", "timeout"],
+    "retryOnExceptionTypes": [
+      "TimeoutError",
+      "ConnectionError",
+      "httpx.TimeoutException",
+      "httpx.ConnectError"
+    ],
+    "doNotRetryExceptionTypes": [
+      "ValueError",
+      "PermissionError"
+    ]
+  },
+
+  "retry": {
+    "maxAttempts": 3,
+    "initialDelayMs": 500,
+    "backoffStrategy": "exponential",
+    "backoffFactor": 2.0,
+    "maxDelayMs": 10000,
+    "jitter": true,
+    "totalRetryBudgetMs": 30000,
+    "perAttemptTimeoutMs": 10000,
+    "respectRetryAfterHeader": true
+  },
+
+  "onFailure": {
+    "severity": "error",
+    "action": "goto_node",
+    "gotoNodeId": "error_handler_1",
+    "continueGraph": true,
+    "returnDefault": null
+  },
+
+  "telemetry": {
+    "emitEvents": true,
+    "includeStack": false,
+    "redactMessage": false
+  },
+
+  "sideEffects": {
+    "idempotent": true,
+    "sideEffectLevel": "external_read",
+    "idempotencyKeyTemplate": null
+  }
+}

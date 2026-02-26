@@ -1,0 +1,7 @@
+{
+  "action": "goto_node", 
+  "severity": "error",
+  "continueGraph": true,
+  "gotoNodeId": "error_handler_1",
+  "returnDefault": null
+}

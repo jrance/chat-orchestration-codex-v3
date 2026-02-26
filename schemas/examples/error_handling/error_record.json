@@ -1,0 +1,25 @@
+{
+  "errorId": "err_01JXYZ...",
+  "runId": "run_123",
+  "threadId": "thread_abc",
+  "nodeId": "tool_node_7",
+  "nodeName": "Call CRM API",
+  "nodeType": "tool",
+  "branchId": "branch_2",
+  "attempt": 3,
+  "maxAttempts": 3,
+  "isFinal": true,
+  "willRetry": false,
+  "errorClass": "TimeoutError",
+  "errorCategory": "timeout",
+  "message": "Request timed out after 10s",
+  "stack": null,
+  "timestampUtc": "2026-02-24T11:10:22.123Z",
+  "nextAction": "goto_node",
+  "nextNodeId": "error_handler_1",
+  "severity": "error",
+  "metadata": {
+    "toolName": "crm_lookup",
+    "mcpServer": null
+  }
+}
