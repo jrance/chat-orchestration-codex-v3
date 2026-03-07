@@ -1,0 +1,18 @@
+# Adjust usernames/teams to match your org
+
+# Default owners
+* @your-org/engineering
+
+# Frontend / builder canvas
+/src/ @your-org/frontend
+/src/features/builder/ @your-org/frontend @your-org/architecture
+
+# Backend
+/server/ @your-org/backend
+/backend/ @your-org/backend
+
+# Shared contracts and docs
+/docs/ @your-org/architecture
+/AGENTS.md @your-org/architecture
+/.github/copilot-instructions.md @your-org/architecture
+/.github/instructions/ @your-org/architecture

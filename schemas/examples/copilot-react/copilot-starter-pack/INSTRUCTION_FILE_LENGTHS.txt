@@ -1,0 +1,3 @@
+.github/copilot-instructions.md: 2856 characters
+.github/instructions/frontend.instructions.md: 2248 characters
+.github/instructions/backend.instructions.md: 1732 characters
